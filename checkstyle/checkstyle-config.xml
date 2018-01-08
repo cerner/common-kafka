@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE module PUBLIC "-//Puppy Crawl//DTD Check Configuration 1.3//EN" "http://www.puppycrawl.com/dtds/configuration_1_3.dtd">
+
+<module name="Checker">
+
+    <!-- setting the default severity to error -->
+    <property name="severity" value="error" />
+
+    <!-- No TAB characters in the source code -->
+    <module name="FileTabCharacter">
+        <property name="eachLine" value="true"/>
+        <property name="fileExtensions" value="java,xml"/>
+    </module>
+
+    <module name="TreeWalker">
+    <!-- Checks for Size Violations. -->
+    <!-- See http://checkstyle.sf.net/config_sizes.html -->
+    <module name="LineLength">
+        <property name="max" value="132" />
+        <property name="tabWidth" value="4" />
+    </module>
+
+    <!-- Checks for blocks. You know, those {}'s -->
+    <!-- See http://checkstyle.sf.net/config_blocks.html -->
+    <module name="LeftCurly">
+        <property name="maxLineLength" value="132" />
+    </module>
+    <module name="EmptyBlock" />
+    <module name="Indentation" />
+
+    <!-- Configuring check for suppressing Javadoc for member variables -->
+    <!-- See http://checkstyle.sf.net/config_javadoc.html -->
+    <module name="JavadocVariable">
+        <property name="scope" value="nothing"/>
+    </module>
+
+    <!-- Configuring check for not checking first sentence of Javadoc comments for a period -->
+    <!-- See http://checkstyle.sf.net/config_javadoc.html -->
+    <module name="JavadocStyle">
+        <property name="checkFirstSentence" value="false"/>
+    </module>
+
+    <!-- Checks for Javadoc comments. -->
+    <!-- See http://checkstyle.sf.net/config_javadoc.html -->
+    <module name="MissingDeprecated" />
+    <module name="MissingOverride" />
+
+    <!-- Checks for Naming Conventions. -->
+    <!-- See http://checkstyle.sf.net/config_naming.html -->
+    <module name="ConstantName" />
+    <module name="LocalVariableName" />
+    <module name="MemberName" />
+    <module name="MethodName" />
+    <module name="LocalFinalVariableName" />
+    <module name="PackageName" />
+    <module name="ParameterName" />
+    <module name="StaticVariableName" />
+    <module name="TypeName" />
+
+    <!-- Checks for imports -->
+    <!-- See http://checkstyle.sf.net/config_import.html -->
+    <module name="IllegalImport" />
+    <module name="RedundantImport" />
+    <module name="UnusedImports" />
+    <module name="AvoidStarImport" />
+
+    <!-- Modifier Checks -->
+    <!-- See http://checkstyle.sf.net/config_modifiers.html -->
+    <module name="ModifierOrder" />
+    <module name="RedundantModifier" />
+    </module>
+</module>

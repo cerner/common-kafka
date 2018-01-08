@@ -1,0 +1,9 @@
+target/
+.idea/
+*.iml
+*/generated/
+*/dependency-reduced-pom.xml
+**/.settings
+**/.project
+**/.classpath
+.ruby-version

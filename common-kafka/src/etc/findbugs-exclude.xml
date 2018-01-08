@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!-- This doesn't matter specifically and is copied code that will be removed -->
+    <Match>
+        <Class name="com.cerner.common.kafka.consumer.assignors.FairAssignor$ConsumerFairness" />
+        <Bug pattern="SE_COMPARATOR_SHOULD_BE_SERIALIZABLE" />
+    </Match>
+    <Match>
+        <Class name="com.cerner.common.kafka.consumer.assignors.FairAssignor$TopicOrder" />
+        <Bug pattern="SE_COMPARATOR_SHOULD_BE_SERIALIZABLE" />
+    </Match>
+</FindBugsFilter>
