@@ -33,7 +33,7 @@ common-kafka-test.
 
 ## Contribute
 
-You are more than welcome to Contribute to Beadledom.
+You are more than welcome to Contribute to Common-Kafka.
 
 Read our [Contribution guidelines](CONTRIBUTING.md).
 
