@@ -14,8 +14,8 @@
   </organization>
 
   <scm>
-    <connection>scm:git:git@github.com:cerner/common-kafka.git</connection>
-    <developerConnection>scm:git:ssh@github.com:cerner/common-kafka.git</developerConnection>
+    <connection>scm:git:https://github.com/cerner/common-kafka.git</connection>
+    <developerConnection>scm:git:https://github.com/cerner/common-kafka.git</developerConnection>
     <url>http://github.com/cerner/common-kafka/tree/master</url>
   </scm>
 
