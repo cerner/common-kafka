@@ -2,6 +2,35 @@
 
 This repository contains common Kafka code supporting Cerner's cloud-based solutions.
 
+For maven add the following,
+
+```
+<!-- For client utilities -->
+<dependency>
+    <groupId>com.cerner.common.kafka</groupId>
+    <artifactId>common-kafka</artifactId>
+    <version>1.2</version>
+</dependency>
+<!-- For admin utilities -->
+<dependency>
+    <groupId>com.cerner.common.kafka</groupId>
+    <artifactId>common-kafka-admin</artifactId>
+    <version>1.2</version>
+</dependency>
+<!-- For connect utilities -->
+<dependency>
+    <groupId>com.cerner.common.kafka</groupId>
+    <artifactId>common-kafka-connect</artifactId>
+    <version>1.2</version>
+</dependency>
+<!-- For test utilities -->
+<dependency>
+    <groupId>com.cerner.common.kafka</groupId>
+    <artifactId>common-kafka-test</artifactId>
+    <version>1.2</version>
+</dependency>
+```
+
 ## Project Inventory
 
 The following modules are available for use,
