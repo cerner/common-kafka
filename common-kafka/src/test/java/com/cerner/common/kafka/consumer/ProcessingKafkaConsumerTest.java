@@ -188,15 +188,17 @@ public class ProcessingKafkaConsumerTest {
         assertThat(nextRecordIsPresent(), is(record2));
         assertThat(nextRecordIsPresent(), is(record3));
 
-        // Since now we have called #poll() twice we should have a latency measurement
-        assertThat(ProcessingKafkaConsumer.POLL_LATENCY.count(), is(previousPollLatencyCount + 1));
+        // Since we have only called #poll() twice we should not yet have a latency measurement
+        assertThat(ProcessingKafkaConsumer.POLL_LATENCY.count(), is(previousPollLatencyCount));
 
         verify(consumer, times(2)).poll(POLL_TIME);
 
         // There is only 2 message in the second set so this should read the 3rd batch
         assertThat(nextRecordIsPresent(), is(record4));
         verify(consumer, times(3)).poll(POLL_TIME);
-        assertThat(ProcessingKafkaConsumer.POLL_LATENCY.count(), is(previousPollLatencyCount + 2));
+
+        // This tracks the time from the start of the 2nd poll to the start of the 3rd poll
+        assertThat(ProcessingKafkaConsumer.POLL_LATENCY.count(), is(previousPollLatencyCount + 1));
     }
 
     @Test

@@ -179,6 +179,11 @@ public class ProcessingKafkaConsumer<K, V> implements Closeable {
     protected long lastPollTime = -1L;
 
     /**
+     * Number of times Consumer#poll(long) was called
+     */
+    private long pollCount = 0L;
+
+    /**
      * Creates a new {@link ProcessingKafkaConsumer} with the given configuration using the {@link KafkaConsumer}
      *
      * @param config the configuration used by the consumer
@@ -307,7 +312,9 @@ public class ProcessingKafkaConsumer<K, V> implements Closeable {
 
             long currentTime = System.currentTimeMillis();
 
-            if (lastPollTime != -1L) {
+            // Exclude the first poll from the latency timer, since it takes approximately max.poll.interval.ms as the
+            // consumer group is stabilizing.
+            if (lastPollTime != -1L && pollCount > 1L) {
                 long pollLatency = currentTime - lastPollTime;
 
                 POLL_LATENCY.update(pollLatency);
@@ -319,6 +326,7 @@ public class ProcessingKafkaConsumer<K, V> implements Closeable {
             }
 
             lastPollTime = currentTime;
+            ++pollCount;
 
             return consumer.poll(timeout);
         } catch (IllegalStateException e) {
