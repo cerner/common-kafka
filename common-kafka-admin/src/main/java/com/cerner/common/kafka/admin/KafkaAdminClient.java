@@ -19,6 +19,7 @@ import org.I0Itec.zkclient.ZkConnection;
 import org.I0Itec.zkclient.exception.ZkException;
 import org.I0Itec.zkclient.exception.ZkNoNodeException;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.kafka.clients.admin.NewPartitions;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.GroupCoordinatorNotAvailableException;
@@ -119,6 +120,8 @@ public class KafkaAdminClient implements Closeable {
      * Admin client from Kafka to look up information about consumer groups
      */
     private AdminClient adminClient = null;
+
+    private org.apache.kafka.clients.admin.AdminClient newAdminClient = null;
 
     /**
      * Creates a Kafka admin client with the given properties
@@ -675,10 +678,7 @@ public class KafkaAdminClient implements Closeable {
         LOG.debug("Adding topic partitions for topic [{}] with partitions [{}]", topic, partitions);
 
         try {
-            // Argument 4 is replica assignment. We pass "" to tell Kafka to come up with its own assignments for the new
-            // partitions
-            // Argument 5 is to check if the assigned broker replica is available
-            AdminUtils.addPartitions(zkUtils, topic, partitions, "", true, RackAwareMode.Enforced$.MODULE$);
+            getClientAdminClient().createPartitions(Collections.singletonMap(topic, NewPartitions.increaseTo(partitions)));
         } catch (ZkException e) {
             throw new AdminOperationException("Unable to add partitions to topic: " + topic, e);
         }
@@ -715,7 +715,7 @@ public class KafkaAdminClient implements Closeable {
             throw new IllegalArgumentException("consumerGroup cannot be null, empty or blank");
 
         try {
-            return getAdminClient().describeConsumerGroup(consumerGroup);
+            return getAdminClient().describeConsumerGroup(consumerGroup, operationTimeout);
         } catch (KafkaException e) {
             throw new AdminOperationException("Unable to retrieve summary for consumer group: " + consumerGroup, e);
         }
@@ -743,10 +743,9 @@ public class KafkaAdminClient implements Closeable {
         try {
             // this will throw IAE if the consumer group is dead/empty and GroupCoordinatorNotAvailableException if the group is
             // re-balancing / initializing
-
             // We can't call the getConsumerGroupSummary(..) above as it would wrap the GroupCoordinatorNotAvailableException and
             // we wouldn't handle it properly here
-            summary = getAdminClient().describeConsumerGroup(consumerGroup);
+            summary = getAdminClient().describeConsumerGroup(consumerGroup, operationTimeout);
         } catch (IllegalArgumentException | GroupCoordinatorNotAvailableException e) {
             LOG.debug("Error while attempting to describe consumer group {}", consumerGroup, e);
             return Collections.emptyList();
@@ -795,6 +794,13 @@ public class KafkaAdminClient implements Closeable {
         return adminClient;
     }
 
+    private org.apache.kafka.clients.admin.AdminClient getClientAdminClient(){
+        if (newAdminClient == null)
+            newAdminClient = org.apache.kafka.clients.admin.AdminClient.create(properties);
+
+        return newAdminClient;
+    }
+
     @Override
     public void close() {
         zkUtils.close();
@@ -804,6 +810,10 @@ public class KafkaAdminClient implements Closeable {
 
         if (adminClient != null)
             adminClient.close();
+
+        if (newAdminClient != null){
+            newAdminClient.close();
+        }
     }
 
     private boolean operationTimedOut(long start) {

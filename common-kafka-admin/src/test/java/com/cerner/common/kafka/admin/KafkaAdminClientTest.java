@@ -42,6 +42,7 @@ import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
@@ -649,6 +650,8 @@ public class KafkaAdminClientTest {
     }
 
     @Test (expected = AdminOperationException.class)
+    @Ignore
+    //ignoring b/c removing interaction with ZK
     public void addTopicPartitions_zkException() {
         failureClient.addTopicPartitions(topic, 5);
     }

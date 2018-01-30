@@ -95,6 +95,7 @@ public abstract class AbstractKafkaTests {
 
     public static void startKafka() throws IOException {
         Properties properties = new Properties();
+        properties.setProperty("offsets.topic.replication.factor", Integer.toString(1));
         startKafka(properties);
     }
 
