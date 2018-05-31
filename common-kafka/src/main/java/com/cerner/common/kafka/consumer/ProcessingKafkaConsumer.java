@@ -15,6 +15,7 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.serialization.Deserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -192,6 +193,21 @@ public class ProcessingKafkaConsumer<K, V> implements Closeable {
      */
     public ProcessingKafkaConsumer(ProcessingConfig config) {
         this(config, new KafkaConsumer<>(config.getProperties()));
+    }
+
+    /**
+     * Creates a new {@link ProcessingKafkaConsumer} with the given configuration and deserializers using the {@link KafkaConsumer}.
+     *
+     * @param config the configuration used by the consumer
+     * @param keyDeserializer The deserializer instance for value. When passing the deserializer instance
+     *          directly, the {@link Deserializer#configure(Map, boolean)} method will not be called.
+     * @param valueDeserializer The deserializer instance for value. When passing the deserializer instance
+     *          directly, the {@link Deserializer#configure(Map, boolean)} method will not be called.
+     * @throws NullPointerException if config is {@code null}
+     * @throws KafkaException if there is an issue creating the {@link KafkaConsumer}
+     */
+    public ProcessingKafkaConsumer(ProcessingConfig config, Deserializer<K> keyDeserializer, Deserializer<V> valueDeserializer) {
+        this(config, new KafkaConsumer<>(config.getProperties(), keyDeserializer, valueDeserializer));
     }
 
     /**

@@ -29,7 +29,6 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
-
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -38,7 +37,9 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.clients.consumer.OffsetResetStrategy;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -148,6 +149,28 @@ public class ProcessingKafkaConsumerTest {
     public void constructorWithConsumer() {
         assertThat(processingConsumer.getConsumer(), is(consumer));
     }
+
+    @Test
+    public void constructorWithDeserializers_nullConfig() {
+        Deserializer<String> keyDeserializer = new StringDeserializer();
+        Deserializer<String> valueDeserializer = new StringDeserializer();
+        try {
+            new ProcessingKafkaConsumer(null, keyDeserializer, valueDeserializer);
+            Assert.fail("Expected NullPointerException to be thrown");
+        } catch (NullPointerException e) {
+        }
+    }
+
+    @Test
+    public void constructorWithDeserializers() throws IOException {
+        Deserializer<String> keyDeserializer = new StringDeserializer();
+        Deserializer<String> valueDeserializer = new StringDeserializer();
+        try (ProcessingKafkaConsumer<String, String> processingKafkaConsumer =
+                 new ProcessingKafkaConsumer<>(config, keyDeserializer, valueDeserializer)) {
+            assertThat(processingKafkaConsumer.getConsumer(), is(instanceOf(KafkaConsumer.class)));
+        }
+    }
+
 
     @Test
     public void nextRecord() {
