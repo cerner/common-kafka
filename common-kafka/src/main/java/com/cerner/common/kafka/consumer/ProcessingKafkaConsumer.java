@@ -199,7 +199,7 @@ public class ProcessingKafkaConsumer<K, V> implements Closeable {
      * Creates a new {@link ProcessingKafkaConsumer} with the given configuration and deserializers using the {@link KafkaConsumer}.
      *
      * @param config the configuration used by the consumer
-     * @param keyDeserializer The deserializer instance for value. When passing the deserializer instance
+     * @param keyDeserializer The deserializer instance for key. When passing the deserializer instance
      *          directly, the {@link Deserializer#configure(Map, boolean)} method will not be called.
      * @param valueDeserializer The deserializer instance for value. When passing the deserializer instance
      *          directly, the {@link Deserializer#configure(Map, boolean)} method will not be called.
