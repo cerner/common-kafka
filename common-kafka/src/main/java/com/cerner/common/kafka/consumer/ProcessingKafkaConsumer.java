@@ -15,6 +15,7 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.serialization.Deserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,6 +26,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -187,11 +189,35 @@ public class ProcessingKafkaConsumer<K, V> implements Closeable {
      * Creates a new {@link ProcessingKafkaConsumer} with the given configuration using the {@link KafkaConsumer}
      *
      * @param config the configuration used by the consumer
-     * @throws IllegalArgumentException               if config is {@code null}
+     * @throws IllegalArgumentException if config is {@code null}
      * @throws KafkaException if there is an issue creating the {@link KafkaConsumer}
      */
     public ProcessingKafkaConsumer(ProcessingConfig config) {
-        this(config, new KafkaConsumer<>(config.getProperties()));
+        this(config, new KafkaConsumer<>(extractProperties(config)));
+    }
+
+    /**
+     * Creates a new {@link ProcessingKafkaConsumer} with the given configuration and deserializers using the {@link KafkaConsumer}.
+     *
+     * @param config the configuration used by the consumer
+     * @param keyDeserializer The deserializer instance for key. When passing the deserializer instance
+     *          directly, the {@link Deserializer#configure(Map, boolean)} method will not be called. If null,
+     *          then it will fall back to the {@code key.deserializer} config property
+     * @param valueDeserializer The deserializer instance for value. When passing the deserializer instance
+     *          directly, the {@link Deserializer#configure(Map, boolean)} method will not be called. If null,
+     *          then it will fall back to the {@code value.deserializer} config property
+     * @throws IllegalArgumentException if config is {@code null}
+     * @throws KafkaException if there is an issue creating the {@link KafkaConsumer}
+     */
+    public ProcessingKafkaConsumer(ProcessingConfig config, Deserializer<K> keyDeserializer, Deserializer<V> valueDeserializer) {
+        this(config, new KafkaConsumer<>(extractProperties(config), keyDeserializer, valueDeserializer));
+    }
+
+    private static Properties extractProperties(ProcessingConfig config) {
+        if (config == null)
+            throw new IllegalArgumentException("config cannot be null");
+
+        return config.getProperties();
     }
 
     /**
