@@ -146,6 +146,11 @@ public class ProcessingKafkaConsumerTest {
         }
     }
 
+    @Test(expected = IllegalArgumentException.class)
+    public void constructorWithoutConsumer_nullConfig() {
+            new ProcessingKafkaConsumer(null);
+    }
+
     @Test
     public void constructorWithConsumer() {
         assertThat(processingConsumer.getConsumer(), is(consumer));
@@ -157,8 +162,8 @@ public class ProcessingKafkaConsumerTest {
         Deserializer<String> valueDeserializer = new StringDeserializer();
         try {
             new ProcessingKafkaConsumer(null, keyDeserializer, valueDeserializer);
-            Assert.fail("Expected NullPointerException to be thrown");
-        } catch (NullPointerException e) {
+            Assert.fail("Expected IllegalArgumentException to be thrown");
+        } catch (IllegalArgumentException e) {
         }
     }
 
