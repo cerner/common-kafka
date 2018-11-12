@@ -518,6 +518,7 @@ public class ProcessingPartitionTest {
         // Since our offset is out of range we will fall back to the offset based on our reset strategy
         // We set the reset strategy to earliest so this should give earliest offset
         assertThat(partition.getLastCommittedOffset(), is(1L));
+        verify(consumer).commitSync(Collections.singletonMap(topicPartition, any(OffsetAndMetadata.class)));
     }
 
     @Test
@@ -527,6 +528,7 @@ public class ProcessingPartitionTest {
         partition.latestBrokerOffset = 100L;
 
         assertThat(partition.getLastCommittedOffset(), is(0L));
+        verify(consumer, never()).commitSync(any());
     }
 
     @Test
@@ -541,6 +543,7 @@ public class ProcessingPartitionTest {
         // Since our offset is out of range we will fall back to the offset based on our reset strategy
         // We set the reset strategy to earliest so this should give earliest offset
         assertThat(partition.getLastCommittedOffset(), is(25L));
+        verify(consumer).commitSync(Collections.singletonMap(topicPartition, any(OffsetAndMetadata.class)));
     }
 
     @Test
@@ -550,6 +553,7 @@ public class ProcessingPartitionTest {
         partition.latestBrokerOffset = 123L;
 
         assertThat(partition.getLastCommittedOffset(), is(123L));
+        verify(consumer, never()).commitSync(any());
     }
 
     @Test
@@ -559,6 +563,7 @@ public class ProcessingPartitionTest {
         partition.latestBrokerOffset = 250L;
 
         assertThat(partition.getLastCommittedOffset(), is(123L));
+        verify(consumer, never()).commitSync(any());
     }
 
     @Test
@@ -570,7 +575,7 @@ public class ProcessingPartitionTest {
         partition.getLastCommittedOffset();
         verify(consumer).commitSync(Collections.singletonMap(topicPartition, new OffsetAndMetadata(123L)));
         assertThat(logAppender.getLogs(),
-                hasItem("Unable to commit offset during initialization of partition " + topicPartition +
+                hasItem("Unable to commit reset offset 123 during initialization of partition " + topicPartition +
                         " for group my-group"));
     }
 

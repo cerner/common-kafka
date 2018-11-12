@@ -321,14 +321,14 @@ public class ProcessingPartition<K, V> implements Closeable {
     /**
      * Returns the offset to use as the partition's last committed offset. This value indicates where we will start
      * reading on the partition and is used to determine what offset is eligible for committing and where to rewind to
-     * re-read a message
+     * re-read a message. The returned offset is ensured to be committed, if {@link ProcessingConfig#getCommitInitialOffset()
+     * allowed} by the configuration.
      *
      * @return the offset to use as the partition's last committed offset
      *
      * @throws IllegalStateException if an error occurs looking up the consumer's committed offset or broker offset values
      */
     protected long getLastCommittedOffset() {
-
         OffsetAndMetadata lastCommittedOffset;
         try {
             lastCommittedOffset = consumer.committed(topicPartition);
@@ -339,23 +339,7 @@ public class ProcessingPartition<K, V> implements Closeable {
         // If we don't have a committed offset use the reset offset
         if (lastCommittedOffset == null) {
             LOGGER.debug("No offset committed for partition [{}]", topicPartition);
-
-            long offset = getResetOffset();
-
-            LOGGER.debug("Using reset offset [{}] for partition [{}] as last committed offset", offset, topicPartition);
-
-            // Consumer doesn't have an offset so try to commit the offset. This can be helpful for monitoring in case
-            // there are no messages in the queue or processing is failing
-            if (config.getCommitInitialOffset()) {
-                try {
-                    consumer.commitSync(Collections.singletonMap(topicPartition, new OffsetAndMetadata(offset)));
-                } catch (KafkaException e) {
-                    LOGGER.warn("Unable to commit offset during initialization of partition {} for group {}", topicPartition,
-                            config.getGroupId(), e);
-                }
-            }
-
-            return offset;
+            return getCommittedResetOffset();
         }
 
         long offset = lastCommittedOffset.offset();
@@ -366,7 +350,6 @@ public class ProcessingPartition<K, V> implements Closeable {
 
         // Verify our committed offset is not before the earliest offset
         if (offset < startOffset) {
-
             // If our offset is before the start offset this likely means processing was stopped/stalled for so long
             // messages fell off the queue and we failed to process them
             if (LOGGER.isErrorEnabled())
@@ -374,36 +357,54 @@ public class ProcessingPartition<K, V> implements Closeable {
                         + " that processing missed messages", offset, startOffset, topicPartition);
 
             // If it's not in range use the reset offset as that's where we will be starting from
-            long resetOffset = getResetOffset();
-
-            LOGGER.debug("Using reset offset [{}] for partition [{}] as last committed offset", resetOffset, topicPartition);
-
-            return resetOffset;
+            return getCommittedResetOffset();
         }
 
         long endOffset = getLatestOffset();
 
         // Verify our committed offset is not after the latest offset
         if (offset > endOffset) {
-
             if (LOGGER.isWarnEnabled())
                 LOGGER.warn("Committed offset [{}] is after latest offset [{}] for partition [{}]. This could indicate " +
                         "a bug in the ProcessingConsumer, a topic being re-created or something else updating offsets",
                         offset, endOffset, topicPartition);
 
             // If it's not in range use the reset offset as that's where we will be starting from
-            long resetOffset = getResetOffset();
-
-            LOGGER.debug("Using reset offset [{}] for partition [{}] as last committed offset", resetOffset, topicPartition);
-
-            return resetOffset;
+            return getCommittedResetOffset();
         }
 
         if (LOGGER.isDebugEnabled())
-            LOGGER.debug("Using offset [{}] for partition [{}] as it is in range of start [{}] / end [{}] broker offsets",
+            LOGGER.debug("Using committed offset [{}] for partition [{}] as it is in range of start [{}] / end [{}] broker offsets",
                 offset, topicPartition, startOffset, endOffset);
 
         return offset;
+    }
+
+    /**
+     * Returns the reset offset used in situations where the consumer has no committed offset for a partition, or its committed
+     * offset is out of range. The returned offset is ensured to be committed, if {@link ProcessingConfig#getCommitInitialOffset()
+     * allowed} by the configuration.
+     *
+     * @return the reset offset
+     */
+    private long getCommittedResetOffset() {
+        // Get the reset offset
+        long resetOffset = getResetOffset();
+
+        LOGGER.debug("Using reset offset [{}] for partition [{}] as last committed offset", resetOffset, topicPartition);
+
+        // Consumer doesn't have an offset so try to commit the offset. This can be helpful for monitoring in case
+        // there are no messages in the queue or processing is failing
+        if (config.getCommitInitialOffset()) {
+            try {
+                consumer.commitSync(Collections.singletonMap(topicPartition, new OffsetAndMetadata(resetOffset)));
+            } catch (KafkaException e) {
+                LOGGER.warn("Unable to commit reset offset {} during initialization of partition {} for group {}", resetOffset,
+                        topicPartition, config.getGroupId(), e);
+            }
+        }
+
+        return resetOffset;
     }
 
     /**
