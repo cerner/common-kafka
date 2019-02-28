@@ -34,7 +34,7 @@ Releasing the Project
 
 If you've done the setup to release the project do the following,
 
-`mvn release:clean release:prepare release:perform`
+`mvn release:clean release:prepare release:perform -P ossrh`
 
 This will,
 
@@ -46,12 +46,13 @@ This will,
 At this point you can check the artifacts if you would like in the 
 [staging repo](https://oss.sonatype.org). If everything looks good you can then do,
 
-`mvn nexus-staging:release -P ossrh -DstagingRepositoryId=comcernercommonkafka-1000`
+`mvn nexus-staging:release -P ossrh -DstagingRepositoryId=REPO_ID`
 
 This promotes the artifacts from staging to public maven central.
 
-The repo ID may be incorrect. If it doesn't work find the artifact in the 
-[staging repo](https://oss.sonatype.org) and it should have the repo ID/name.
+You can get the `REPO_ID` either look for,  
+`Closing staging repository with ID "comcernercommonkafka-1002"` 
+in the maven logs or from the [staging repo](https://oss.sonatype.org). 
 
 ### Common Issues
 
@@ -67,3 +68,11 @@ If the maven release plugin fails to commit things to git or create tags you can
 the following,
 
 `git config --add status.displayCommentPrefix true`
+
+If the staging repository promotion command fails with 
+`Unhandled: Repository: comcernercommonkafka-1001 has invalid state: open` 
+this likely means the project doesn't meet some requirement of the sonatype 
+repo. You can attempt to manually close the repo via the 
+[staging repo](https://oss.sonatype.org) webUI which will prep it to be 
+promoted. It should run the staged artifacts through a check process and 
+fail for any issues. 
