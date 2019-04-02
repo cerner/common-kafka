@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -176,12 +177,12 @@ public class ProcessingKafkaConsumer<K, V> implements Closeable {
     protected volatile boolean pauseCommit = false;
 
     /**
-     * The last time Consumer#poll(long) was called
+     * The last time Consumer#poll(Duration) was called
      */
     protected long lastPollTime = -1L;
 
     /**
-     * Number of times Consumer#poll(long) was called
+     * Number of times Consumer#poll(Duration) was called
      */
     private long pollCount = 0L;
 
@@ -354,7 +355,7 @@ public class ProcessingKafkaConsumer<K, V> implements Closeable {
             lastPollTime = currentTime;
             ++pollCount;
 
-            return consumer.poll(timeout);
+            return consumer.poll(Duration.ofMillis(timeout));
         } catch (IllegalStateException e) {
             // The Kafka consumer will throw this exception if the consumer is not currently subscribed to any topics. Return an
             // empty record collection after verifying that is in fact the case, otherwise rethrow the exception.
@@ -489,7 +490,10 @@ public class ProcessingKafkaConsumer<K, V> implements Closeable {
     }
 
     /**
-     * Reset the consumer to start consuming from the specified offset values
+     * Reset the consumer to start consuming from the specified offset values. Offsets for partitions not currently
+     * assigned to this consumer will be ignored. Note that the partition assignment can be empty immediately after
+     * {@link #subscribe(Collection) subscribing to topics} prior to a {@link #nextRecord(long) poll of sufficient
+     * duration}, or when partitions are in the process of getting reassigned.
      * 
      * @param offsets the offsets to reset the consumer to
      * @throws IllegalArgumentException if {@code offsets} is {@code null}
@@ -499,8 +503,8 @@ public class ProcessingKafkaConsumer<K, V> implements Closeable {
         if (offsets == null)
             throw new IllegalArgumentException("offsets cannot be null");
 
-        // Inquire the partitions that are assigned to this consumer.
-        Set<TopicPartition> assignedPartitions = getAssignedPartitions();
+        // Inquire the partitions that are assigned to this consumer currently.
+        Set<TopicPartition> assignedPartitions = consumer.assignment();
         LOGGER.debug("resetting offsets for assigned partitions {}", assignedPartitions);
 
         // Close and remove all assigned partitions, they will be regenerated as new messages are read.
@@ -517,16 +521,6 @@ public class ProcessingKafkaConsumer<K, V> implements Closeable {
 
         // Seek consumer to the offsets that were just committed for its assigned partitions.
         offsetsToCommit.entrySet().stream().forEach(e -> consumer.seek(e.getKey(), e.getValue().offset()));
-    }
-
-    private Set<TopicPartition> getAssignedPartitions() {
-        Set<TopicPartition> assignedPartitions = consumer.assignment();
-        if (assignedPartitions.isEmpty()) {
-            // Polling with an immediate timeout will initialize the assignments for a fresh consumer.
-            pollRecords(0L);
-            assignedPartitions = consumer.assignment();
-        }
-        return assignedPartitions;
     }
 
     /**

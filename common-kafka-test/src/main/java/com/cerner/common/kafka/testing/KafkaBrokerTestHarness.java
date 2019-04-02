@@ -250,10 +250,6 @@ public class KafkaBrokerTestHarness extends ZookeeperTestHarness {
         Properties props = new Properties();
         props.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, getBootstrapServers());
 
-        // These two properties below are increased from their defaults to help with issues during testing
-        props.setProperty(ProducerConfig.RETRY_BACKOFF_MS_CONFIG, Integer.toString(500));
-        props.setProperty(ProducerConfig.RETRIES_CONFIG, Integer.toString(10));
-
         return props;
     }
 
@@ -264,8 +260,6 @@ public class KafkaBrokerTestHarness extends ZookeeperTestHarness {
      */
     public Properties getConsumerProps() {
         Properties props = new Properties();
-
-        // Used by the new consumer
         props.setProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, getBootstrapServers());
 
         return props;
@@ -330,11 +324,13 @@ public class KafkaBrokerTestHarness extends ZookeeperTestHarness {
             props.setProperty(KafkaConfig.LogFlushIntervalMessagesProp(), String.valueOf(1));
             props.setProperty(KafkaConfig.AutoCreateTopicsEnableProp(), String.valueOf(false));
             props.setProperty(KafkaConfig.NumPartitionsProp(), String.valueOf(PARTITIONS_PER_TOPIC));
+            props.setProperty(KafkaConfig.OffsetsTopicReplicationFactorProp(), String.valueOf(brokers));
             props.setProperty(KafkaConfig.DefaultReplicationFactorProp(), String.valueOf(brokers));
-            props.setProperty(KafkaConfig.DeleteTopicEnableProp(), Boolean.TRUE.toString());
+            props.setProperty(KafkaConfig.DeleteTopicEnableProp(), String.valueOf(true));
             props.setProperty(KafkaConfig.OffsetsTopicPartitionsProp(), String.valueOf(PARTITIONS_PER_TOPIC));
             props.setProperty(KafkaConfig.LogIndexSizeMaxBytesProp(), String.valueOf(1024 * 1024));
             props.setProperty(KafkaConfig.LogCleanerEnableProp(), String.valueOf(false));
+            props.setProperty(KafkaConfig.GroupInitialRebalanceDelayMsProp(), String.valueOf(100));
 
             props.putAll(properties);
 

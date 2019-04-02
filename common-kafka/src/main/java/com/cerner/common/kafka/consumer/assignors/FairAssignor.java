@@ -55,7 +55,7 @@ public class FairAssignor extends AbstractPartitionAssignor {
 
     @Override
     public Map<String, List<TopicPartition>> assign(Map<String, Integer> partitionsPerTopic,
-                                                    Map<String, List<String>> subscriptions) {
+                                                    Map<String, Subscription> subscriptions) {
         List<String> consumers = Utils.sorted(subscriptions.keySet());
 
         // Invert topics-per-consumer map to consumers-per-topic.
@@ -90,11 +90,11 @@ public class FairAssignor extends AbstractPartitionAssignor {
     }
 
     private static List<TopicPartition> allPartitionsSorted(Map<String, Integer> partitionsPerTopic,
-                                                            Map<String, List<String>> topicsPerConsumer,
+                                                            Map<String, Subscription> topicsPerConsumer,
                                                             Map<String, List<String>> consumersPerTopic) {
         // Collect all topics
         Set<String> topics = new HashSet<>();
-        topicsPerConsumer.values().forEach(topics::addAll);
+        topicsPerConsumer.values().forEach(subscription -> topics.addAll(subscription.topics()));
 
         // Remove any topics that do not have partition information as this means we don't have metadata about them
         // or they don't exist
@@ -145,10 +145,10 @@ public class FairAssignor extends AbstractPartitionAssignor {
         }
     }
 
-    protected static Map<String, List<String>> consumersPerTopic(Map<String, List<String>> topicsPerConsumer) {
+    protected static Map<String, List<String>> consumersPerTopic(Map<String, Subscription> topicsPerConsumer) {
         Map<String, List<String>> res = new HashMap<>();
-        for (Map.Entry<String, List<String>> subscriptionEntry : topicsPerConsumer.entrySet()) {
-            for (String topic : subscriptionEntry.getValue())
+        for (Map.Entry<String, Subscription> subscriptionEntry : topicsPerConsumer.entrySet()) {
+            for (String topic : subscriptionEntry.getValue().topics())
                 put(res, topic, subscriptionEntry.getKey());
         }
         return res;

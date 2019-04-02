@@ -20,6 +20,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.stream.Collectors;
 
@@ -504,7 +505,7 @@ public class ProcessingPartitionTest {
 
         // We set the reset strategy to earliest so this should give earliest offset
         assertThat(partition.getLastCommittedOffset(), is(partition.getEarliestOffset()));
-        verify(consumer, never()).commitSync(any());
+        verify(consumer, never()).commitSync(any(Map.class));
     }
 
     @Test
@@ -528,7 +529,7 @@ public class ProcessingPartitionTest {
         partition.latestBrokerOffset = 100L;
 
         assertThat(partition.getLastCommittedOffset(), is(0L));
-        verify(consumer, never()).commitSync(any());
+        verify(consumer, never()).commitSync(any(Map.class));
     }
 
     @Test
@@ -553,7 +554,7 @@ public class ProcessingPartitionTest {
         partition.latestBrokerOffset = 123L;
 
         assertThat(partition.getLastCommittedOffset(), is(123L));
-        verify(consumer, never()).commitSync(any());
+        verify(consumer, never()).commitSync(any(Map.class));
     }
 
     @Test
@@ -563,7 +564,7 @@ public class ProcessingPartitionTest {
         partition.latestBrokerOffset = 250L;
 
         assertThat(partition.getLastCommittedOffset(), is(123L));
-        verify(consumer, never()).commitSync(any());
+        verify(consumer, never()).commitSync(any(Map.class));
     }
 
     @Test
