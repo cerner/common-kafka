@@ -13,10 +13,9 @@ No Kafka Connect Sources are currently provided.
 
 ### [KafkaSinkConnector](src/main/java/com/cerner/common/kafka/connect/kafka/KafkaSinkConnector.java)
 
-* A simple Kafka Connect Sink Connector that sends data to another Kafka cluster without any
-transformation or filtering.
-* Requires the use of the `ByteArrayConverter` provided in the project
-* To run this connector in kafka-connect add the `common-kafka` and `commmon-kafka-connect` jars to the kafka-connect classpath
+* A simple Kafka Connect Sink Connector that sends data to another Kafka cluster without any transformation or filtering.
+* Requires the use of the `org.apache.kafka.connect.converters.ByteArrayConverter` converter.
+* To run this connector in kafka-connect add the `common-kafka` and `commmon-kafka-connect` jars to the kafka-connect classpath.
 
 #### Configuration
 
@@ -35,10 +34,3 @@ By default the following is set to ensure everything is delivered,
 * Does not do any deserialization or serialization of data.
 * Sets producer configuration to ensure strong consistency.
 * Writes data to the same topic and partition in the destination Kafka cluster that it was read from the source Kafka cluster.
-
-## Converters
-
-### [ByteArrayConverter](src/main/java/com/cerner/common/kafka/connect/kafka/ByteArrayConverter.java)
-
-* A pass-through Kafka Connect converter for raw byte data. Does not transform the data
-* This is a copy of the [converter from Kafka](https://issues.apache.org/jira/browse/KAFKA-4783) not yet released
