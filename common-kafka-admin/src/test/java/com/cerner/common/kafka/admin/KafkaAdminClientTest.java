@@ -32,6 +32,7 @@ import org.I0Itec.zkclient.ZkConnection;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.ConsumerGroupState;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.InvalidReplicationFactorException;
 import org.apache.kafka.common.errors.InvalidTopicException;
@@ -721,9 +722,10 @@ public class KafkaAdminClientTest {
         }
     }
 
-    @Test (expected = AdminOperationException.class)
+    @Test
     public void getConsumerGroupSummary_doesNotExist() {
-        failureClient.getConsumerGroupSummary("consumer-group-does-not-exist");
+        AdminClient.ConsumerGroupSummary summary = failureClient.getConsumerGroupSummary("consumer-group-does-not-exist");
+        assertThat(summary.state(), is(ConsumerGroupState.DEAD.toString()));
     }
 
     @Test (expected = IllegalArgumentException.class)

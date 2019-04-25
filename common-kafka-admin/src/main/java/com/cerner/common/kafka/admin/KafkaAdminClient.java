@@ -21,7 +21,6 @@ import org.I0Itec.zkclient.exception.ZkException;
 import org.I0Itec.zkclient.exception.ZkNoNodeException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.admin.NewPartitions;
-import org.apache.kafka.common.ConsumerGroupState;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.UnknownTopicOrPartitionException;
@@ -706,7 +705,9 @@ public class KafkaAdminClient implements Closeable {
     }
 
     /**
-     * Retrieves the {@link AdminClient.ConsumerGroupSummary} information from Kafka
+     * Retrieves the {@link AdminClient.ConsumerGroupSummary} information from Kafka. If the specified group is not found then the
+     * returned summary will have a {@link AdminClient.ConsumerGroupSummary#state()} of
+     * {@link org.apache.kafka.common.ConsumerGroupState#DEAD}{@code .toString()}, no exception will be thrown in that case.
      *
      * @param consumerGroup
      *      the name of the consumer group
@@ -719,12 +720,7 @@ public class KafkaAdminClient implements Closeable {
             throw new IllegalArgumentException("consumerGroup cannot be null, empty or blank");
 
         try {
-            AdminClient.ConsumerGroupSummary summary = getAdminClient().describeConsumerGroup(consumerGroup, operationTimeout);
-            if (summary.state().equals(ConsumerGroupState.DEAD.toString())) {
-                throw new AdminOperationException("Consumer group not found: " + consumerGroup);
-            }
-
-            return summary;
+            return getAdminClient().describeConsumerGroup(consumerGroup, operationTimeout);
         } catch (KafkaException e) {
             throw new AdminOperationException("Unable to retrieve summary for consumer group: " + consumerGroup, e);
         }
