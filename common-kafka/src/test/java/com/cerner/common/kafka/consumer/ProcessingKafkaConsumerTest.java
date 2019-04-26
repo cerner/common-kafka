@@ -17,6 +17,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -105,7 +106,7 @@ public class ProcessingKafkaConsumerTest {
         thirdSetMap.put(new TopicPartition(record6.topic(), record6.partition()), Arrays.asList(record6));
         ConsumerRecords<String, String> thirdSet = new ConsumerRecords<>(thirdSetMap);
 
-        when(consumer.poll(anyLong())).thenReturn(firstSet).thenReturn(secondSet).thenReturn(thirdSet);
+        when(consumer.poll(any(Duration.class))).thenReturn(firstSet).thenReturn(secondSet).thenReturn(thirdSet);
         when(consumer.committed(topicPartition)).thenReturn(new OffsetAndMetadata(offset));
         when(consumer.committed(new TopicPartition(record4.topic(), record4.partition())))
                 .thenReturn(new OffsetAndMetadata(record4.offset()));
@@ -185,7 +186,7 @@ public class ProcessingKafkaConsumerTest {
         long previousPollLatencyCount = ProcessingKafkaConsumer.POLL_LATENCY.count();
 
         assertThat(nextRecordIsPresent(), is(record1));
-        verify(consumer).poll(POLL_TIME);
+        verify(consumer).poll(Duration.ofMillis(POLL_TIME));
         assertThat(ProcessingKafkaConsumer.READ_LATENCY.count(), is(previousReadLatencyCount + 1));
         assertThat(ProcessingKafkaConsumer.POLL_MESSAGES.count(), is(previousPollMessagesCount + 1));
 
@@ -200,7 +201,7 @@ public class ProcessingKafkaConsumerTest {
 
         // This should cause us to do another #poll() and read the next record
         assertThat(nextRecordIsPresent(), is(record2));
-        verify(consumer, times(2)).poll(POLL_TIME);
+        verify(consumer, times(2)).poll(Duration.ofMillis(POLL_TIME));
     }
 
     @Test
@@ -208,7 +209,7 @@ public class ProcessingKafkaConsumerTest {
         long previousPollLatencyCount = ProcessingKafkaConsumer.POLL_LATENCY.count();
 
         assertThat(nextRecordIsPresent(), is(record1));
-        verify(consumer).poll(POLL_TIME);
+        verify(consumer).poll(Duration.ofMillis(POLL_TIME));
 
         // Since we only called poll once we can't determine a latency (difference between polls)
         assertThat(ProcessingKafkaConsumer.POLL_LATENCY.count(), is(previousPollLatencyCount));
@@ -220,11 +221,11 @@ public class ProcessingKafkaConsumerTest {
         // Since we have only called #poll() twice we should not yet have a latency measurement
         assertThat(ProcessingKafkaConsumer.POLL_LATENCY.count(), is(previousPollLatencyCount));
 
-        verify(consumer, times(2)).poll(POLL_TIME);
+        verify(consumer, times(2)).poll(Duration.ofMillis(POLL_TIME));
 
         // There is only 2 message in the second set so this should read the 3rd batch
         assertThat(nextRecordIsPresent(), is(record4));
-        verify(consumer, times(3)).poll(POLL_TIME);
+        verify(consumer, times(3)).poll(Duration.ofMillis(POLL_TIME));
 
         // This tracks the time from the start of the 2nd poll to the start of the 3rd poll
         assertThat(ProcessingKafkaConsumer.POLL_LATENCY.count(), is(previousPollLatencyCount + 1));
@@ -258,7 +259,7 @@ public class ProcessingKafkaConsumerTest {
 
         // Setup consumer to read these records
         ConsumerRecords<String, String> records = new ConsumerRecords<>(recordsMap);
-        when(consumer.poll(anyLong())).thenReturn(records);
+        when(consumer.poll(any(Duration.class))).thenReturn(records);
 
         rebuildConsumer();
         processingConsumer.rebalanceListener.onPartitionsAssigned(topicPartitions);
@@ -287,14 +288,14 @@ public class ProcessingKafkaConsumerTest {
 
     @Test
     public void nextRecord_noSubscriptions() {
-        when(consumer.poll(anyLong())).thenThrow(new IllegalStateException());
+        when(consumer.poll(any(Duration.class))).thenThrow(new IllegalStateException());
         when(consumer.subscription()).thenReturn(Collections.emptySet());
         assertThat(processingConsumer.nextRecord(POLL_TIME), is(Optional.empty()));
     }
 
     @Test(expected = IllegalStateException.class)
     public void nextRecord_unexpectedException() {
-        when(consumer.poll(anyLong())).thenThrow(new IllegalStateException());
+        when(consumer.poll(any(Duration.class))).thenThrow(new IllegalStateException());
         when(consumer.subscription()).thenReturn(Collections.singleton("some.topic"));
         processingConsumer.nextRecord(POLL_TIME);
     }
@@ -464,7 +465,6 @@ public class ProcessingKafkaConsumerTest {
 
         processingConsumer.resetOffsets(offsets);
 
-        verify(consumer, never()).poll(anyLong());
         verify(consumer).commitSync(getCommitOffsets(offsets));
         verify(consumer).seek(a0, 5L);
         verify(consumer).seek(a1, 6L);
@@ -486,7 +486,6 @@ public class ProcessingKafkaConsumerTest {
 
         processingConsumer.resetOffsets(offsets);
 
-        verify(consumer).poll(0L);
         verify(consumer, never()).commitSync(anyMap());
         verify(consumer, never()).seek(any(TopicPartition.class), anyLong());
     }
@@ -503,33 +502,8 @@ public class ProcessingKafkaConsumerTest {
 
         processingConsumer.resetOffsets(Collections.emptyMap());
 
-        verify(consumer, never()).poll(anyLong());
         verify(consumer, never()).commitSync(anyMap());
         verify(consumer, never()).seek(any(TopicPartition.class), anyLong());
-    }
-
-    @Test
-    public void resetOffsets_delayedAssignment() {
-        TopicPartition a0 = new TopicPartition("a", 0);
-        TopicPartition a1 = new TopicPartition("a", 1);
-        TopicPartition b0 = new TopicPartition("b", 0);
-
-        Set<TopicPartition> assignment = new HashSet<>();
-        assignment.addAll(Arrays.asList(a0, a1, b0));
-        when(consumer.assignment()).thenReturn(Collections.emptySet()).thenReturn(assignment);
-
-        Map<TopicPartition, Long> offsets = new HashMap<>();
-        offsets.put(a0, 5L);
-        offsets.put(a1, 6L);
-        offsets.put(b0, 7L);
-
-        processingConsumer.resetOffsets(offsets);
-
-        verify(consumer).poll(0L);
-        verify(consumer).commitSync(getCommitOffsets(offsets));
-        verify(consumer).seek(a0, 5L);
-        verify(consumer).seek(a1, 6L);
-        verify(consumer).seek(b0, 7L);
     }
 
     @Test
@@ -549,7 +523,6 @@ public class ProcessingKafkaConsumerTest {
 
         processingConsumer.resetOffsets(offsets);
 
-        verify(consumer, never()).poll(anyLong());
         verify(consumer).commitSync(getCommitOffsets(Collections.singletonMap(a1, 6L)));
         verify(consumer, never()).seek(eq(a0), anyLong());
         verify(consumer).seek(a1, 6L);
@@ -571,7 +544,6 @@ public class ProcessingKafkaConsumerTest {
 
         processingConsumer.resetOffsets(offsets);
 
-        verify(consumer, never()).poll(anyLong());
         verify(consumer).commitSync(getCommitOffsets(offsets));
         verify(consumer, never()).seek(eq(a0), anyLong());
         verify(consumer, never()).seek(eq(a1), anyLong());
@@ -593,7 +565,6 @@ public class ProcessingKafkaConsumerTest {
 
         processingConsumer.resetOffsets(offsets);
 
-        verify(consumer, never()).poll(anyLong());
         verify(consumer, never()).commitSync(anyMap());
         verify(consumer, never()).seek(any(TopicPartition.class), anyLong());
     }
@@ -614,7 +585,6 @@ public class ProcessingKafkaConsumerTest {
 
         processingConsumer.resetOffsets(offsets);
 
-        verify(consumer, never()).poll(anyLong());
         verify(consumer).commitSync(getCommitOffsets(Collections.singletonMap(a0, 5L)));
         verify(consumer).seek(a0, 5L);
         verify(consumer, never()).seek(eq(a1), anyLong());
@@ -955,7 +925,7 @@ public class ProcessingKafkaConsumerTest {
         rebuildConsumer();
 
         // Read the first record in 3 separate batches or poll()'s
-        when(consumer.poll(anyLong())).thenReturn(
+        when(consumer.poll(any(Duration.class))).thenReturn(
                 new ConsumerRecords<>(Collections.singletonMap(topicPartition, Arrays.asList(record1)))).thenReturn(
                 new ConsumerRecords<>(Collections.singletonMap(topicPartition, Arrays.asList(record1)))).thenReturn(
                 new ConsumerRecords<>(Collections.singletonMap(topicPartition, Arrays.asList(record1))));
@@ -1000,7 +970,7 @@ public class ProcessingKafkaConsumerTest {
         rebuildConsumer();
 
         // Read the first record in 4 separate batches or poll()'s
-        when(consumer.poll(anyLong())).thenReturn(
+        when(consumer.poll(any(Duration.class))).thenReturn(
                 new ConsumerRecords<>(Collections.singletonMap(topicPartition, Arrays.asList(record1)))).thenReturn(
                 new ConsumerRecords<>(Collections.singletonMap(topicPartition, Arrays.asList(record1)))).thenReturn(
                 new ConsumerRecords<>(Collections.singletonMap(topicPartition, Arrays.asList(record1)))).thenReturn(
@@ -1127,7 +1097,7 @@ public class ProcessingKafkaConsumerTest {
 
         processingConsumer.nextRecord(POLL_TIME);
 
-        verify(consumer).poll(POLL_TIME);
+        verify(consumer).poll(Duration.ofMillis(POLL_TIME));
 
         // Since we have polled we can commit again
         assertThat(processingConsumer.pauseCommit, is(false));

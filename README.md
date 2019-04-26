@@ -2,32 +2,32 @@
 
 This repository contains common Kafka code supporting Cerner's cloud-based solutions.
 
-For maven add the following,
+For Maven, add the following,
 
 ```
 <!-- For client utilities -->
 <dependency>
     <groupId>com.cerner.common.kafka</groupId>
     <artifactId>common-kafka</artifactId>
-    <version>1.2</version>
+    <version>2.0</version>
 </dependency>
 <!-- For admin utilities -->
 <dependency>
     <groupId>com.cerner.common.kafka</groupId>
     <artifactId>common-kafka-admin</artifactId>
-    <version>1.2</version>
+    <version>2.0</version>
 </dependency>
 <!-- For connect utilities -->
 <dependency>
     <groupId>com.cerner.common.kafka</groupId>
     <artifactId>common-kafka-connect</artifactId>
-    <version>1.2</version>
+    <version>2.0</version>
 </dependency>
 <!-- For test utilities -->
 <dependency>
     <groupId>com.cerner.common.kafka</groupId>
     <artifactId>common-kafka-test</artifactId>
-    <version>1.2</version>
+    <version>2.0</version>
 </dependency>
 ```
 
@@ -50,11 +50,11 @@ Please refer to the project-specific README documentation for content details.
 
 ## Version Requirements
 
-The 1.0 release of common-kafka requires the following dependency versions.
+The 2.0 release of common-kafka uses the following dependency versions.
 
-* [Kafka](http://kafka.apache.org/): 0.10.2.1
+* [Kafka](http://kafka.apache.org/): 2.2.0
 * [Metrics](http://metrics.dropwizard.io/): 2.2.0
-* [Scala](https://scala-lang.org/): 2.12.1
+* [Scala](https://scala-lang.org/): 2.12.8
 * [ZooKeeper](https://zookeeper.apache.org/): 3.4.9
 
 Note that the Scala and ZooKeeper dependencies are only applicable for common-kafka-admin and
@@ -62,7 +62,7 @@ common-kafka-test.
 
 ## Contribute
 
-You are more than welcome to Contribute to Common-Kafka.
+You are welcome to contribute to Common-Kafka.
 
 Read our [Contribution guidelines](CONTRIBUTING.md).
 

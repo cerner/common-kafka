@@ -102,7 +102,7 @@ public class KafkaProducerWrapperTest {
         props.setProperty(KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         props.setProperty(VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         props.setProperty(ProducerConfig.BATCH_SIZE_CONFIG, "10000");
-        props.setProperty(ProducerConfig.LINGER_MS_CONFIG, "600000");
+        props.setProperty(ProducerConfig.LINGER_MS_CONFIG, "60000");
 
         KafkaProducerWrapper<String, String> producer = new KafkaProducerWrapper<>(new KafkaProducer<>(props));
 
@@ -154,7 +154,7 @@ public class KafkaProducerWrapperTest {
         props.setProperty(KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         props.setProperty(VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         props.setProperty(ProducerConfig.BATCH_SIZE_CONFIG, "10000");
-        props.setProperty(ProducerConfig.LINGER_MS_CONFIG, "600000");
+        props.setProperty(ProducerConfig.LINGER_MS_CONFIG, "60000");
 
         KafkaProducerWrapper<String, String> producer = new KafkaProducerWrapper<>(new KafkaProducer<>(props));
 
@@ -199,7 +199,7 @@ public class KafkaProducerWrapperTest {
         props.setProperty(KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         props.setProperty(VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         props.setProperty(ProducerConfig.BATCH_SIZE_CONFIG, "10000");
-        props.setProperty(ProducerConfig.LINGER_MS_CONFIG, "600000");
+        props.setProperty(ProducerConfig.LINGER_MS_CONFIG, "60000");
 
         // create a payload that is too large
         StringBuilder bldr = new StringBuilder();
@@ -238,7 +238,7 @@ public class KafkaProducerWrapperTest {
         props.setProperty(KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         props.setProperty(VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         props.setProperty(ProducerConfig.BATCH_SIZE_CONFIG, "10000");
-        props.setProperty(ProducerConfig.LINGER_MS_CONFIG, "600000");
+        props.setProperty(ProducerConfig.LINGER_MS_CONFIG, "60000");
 
         KafkaProducerWrapper<String, String> producer = new KafkaProducerWrapper<>(new KafkaProducer<>(props));
 

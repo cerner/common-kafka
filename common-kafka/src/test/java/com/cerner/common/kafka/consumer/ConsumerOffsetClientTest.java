@@ -17,6 +17,7 @@ import org.mockito.runners.MockitoJUnitRunner;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -289,8 +290,8 @@ public class ConsumerOffsetClientTest {
         Map<TopicPartition, Long> offsets = new HashMap<>();
         offsets.put(new TopicPartition("topic1", 0), 123L);
         offsets.put(new TopicPartition("topic1", 1), 234L);
-        offsets.put(new TopicPartition("topic2", 0), -1L);
-        offsets.put(new TopicPartition("topic2", 1), -1L);
+        offsets.put(new TopicPartition("topic2", 0), 0L);
+        offsets.put(new TopicPartition("topic2", 1), 0L);
 
         client.commitOffsets(offsets);
 
@@ -298,6 +299,16 @@ public class ConsumerOffsetClientTest {
 
         Map<TopicPartition, OffsetAndMetadata> request = commitRequest.getValue();
         request.forEach((k, v) -> assertThat(v.offset(), is(offsets.get(k))));
+    }
+
+    @Test(expected=IllegalArgumentException.class)
+    public void commitOffsets_negativeValue(){
+        client.commitOffsets(Collections.singletonMap(new TopicPartition("topic1", 0), -1L));
+    }
+
+    @Test(expected=NullPointerException.class)
+    public void commitOffsets_nullValue(){
+        client.commitOffsets(Collections.singletonMap(new TopicPartition("topic1", 0), null));
     }
 
     @Test

@@ -60,7 +60,8 @@ public class KafkaProducerPool<K, V> implements Closeable {
         // Require acknowledgment from all replicas
         DEFAULT_PRODUCER_PROPERTIES.setProperty(ACKS_CONFIG, String.valueOf(-1));
 
-        // Slightly more conservative retry policy (Kafka default is 0 retries, 100 milliseconds apart).
+        // Slightly more conservative retry policy (Kafka default is Integer.MAX_VALUE retries, 100 milliseconds apart,
+        // up to the delivery.timeout.ms value).
         DEFAULT_PRODUCER_PROPERTIES.setProperty(RETRY_BACKOFF_MS_CONFIG, String.valueOf(1000));
         DEFAULT_PRODUCER_PROPERTIES.setProperty(RETRIES_CONFIG, String.valueOf(5));
 

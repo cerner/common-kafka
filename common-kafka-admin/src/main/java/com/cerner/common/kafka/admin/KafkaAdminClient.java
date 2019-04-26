@@ -14,14 +14,15 @@ import kafka.server.ConfigType;
 import kafka.utils.VerifiableProperties;
 import kafka.utils.ZKConfig;
 import kafka.utils.ZkUtils;
+import kafka.zookeeper.ZooKeeperClientException;
 import org.I0Itec.zkclient.ZkClient;
 import org.I0Itec.zkclient.ZkConnection;
 import org.I0Itec.zkclient.exception.ZkException;
 import org.I0Itec.zkclient.exception.ZkNoNodeException;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.kafka.clients.admin.NewPartitions;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
-import org.apache.kafka.common.errors.GroupCoordinatorNotAvailableException;
 import org.apache.kafka.common.errors.UnknownTopicOrPartitionException;
 import org.apache.kafka.common.security.auth.KafkaPrincipal;
 import org.slf4j.Logger;
@@ -121,6 +122,11 @@ public class KafkaAdminClient implements Closeable {
     private AdminClient adminClient = null;
 
     /**
+     * New java admin client
+     */
+    private org.apache.kafka.clients.admin.AdminClient newAdminClient = null;
+
+    /**
      * Creates a Kafka admin client with the given properties
      *
      * @param properties
@@ -163,7 +169,7 @@ public class KafkaAdminClient implements Closeable {
             ZKConfig zkConfig = new ZKConfig(new VerifiableProperties(properties));
             tuple = ZkUtils.createZkClientAndConnection(zkConfig.zkConnect(), zkConfig.zkSessionTimeoutMs(),
                     zkConfig.zkConnectionTimeoutMs());
-        } catch (ZkException e) {
+        } catch (ZkException | ZooKeeperClientException e) {
             throw new AdminOperationException("Unable to create admin connection", e);
         }
 
@@ -193,7 +199,7 @@ public class KafkaAdminClient implements Closeable {
         LOG.debug("Retrieving all topics");
         try {
             return Collections.unmodifiableSet(convertToJavaSet(zkUtils.getAllTopics().iterator()));
-        } catch (ZkException e) {
+        } catch (ZkException | ZooKeeperClientException e) {
             throw new AdminOperationException("Unable to retrieve all topics", e);
         }
     }
@@ -217,7 +223,7 @@ public class KafkaAdminClient implements Closeable {
                 return Collections.unmodifiableSet(convertToJavaSet(zkUtils.getAllPartitions().iterator()));
             } catch (ZkNoNodeException e) {
                 LOG.debug("Reading partitions had an error", e);
-            } catch (ZkException e) {
+            } catch (ZkException | ZooKeeperClientException e) {
                 throw new AdminOperationException("Unable to retrieve all partitions", e);
             }
 
@@ -270,7 +276,7 @@ public class KafkaAdminClient implements Closeable {
                 Authorizer simpleAclAuthorizer = new SimpleAclAuthorizer();
                 simpleAclAuthorizer.configure(authorizerProps);
                 authorizer = simpleAclAuthorizer;
-            } catch (ZkException e) {
+            } catch (ZkException | ZooKeeperClientException e) {
                 throw new AdminOperationException("Unable to create authorizer", e);
             }
         }
@@ -290,7 +296,7 @@ public class KafkaAdminClient implements Closeable {
         LOG.debug("Fetching all ACLs");
         try {
             return convertKafkaAclMap(getAuthorizer().getAcls());
-        } catch (ZkException e) {
+        } catch (ZkException | ZooKeeperClientException e) {
             throw new AdminOperationException("Unable to retrieve all ACLs", e);
         }
     }
@@ -314,7 +320,7 @@ public class KafkaAdminClient implements Closeable {
 
         try {
             return convertKafkaAclMap(getAuthorizer().getAcls(principal));
-        } catch (ZkException e) {
+        } catch (ZkException | ZooKeeperClientException e) {
             throw new AdminOperationException("Unable to retrieve ACLs for principal: " + principal, e);
         }
     }
@@ -344,7 +350,7 @@ public class KafkaAdminClient implements Closeable {
 
         try {
             return Collections.unmodifiableSet(convertToJavaSet(getAuthorizer().getAcls(resource).iterator()));
-        } catch (ZkException e) {
+        } catch (ZkException | ZooKeeperClientException e) {
             throw new AdminOperationException("Unable to retrieve ACLs for resource: " + resource, e);
         }
     }
@@ -371,7 +377,7 @@ public class KafkaAdminClient implements Closeable {
 
         try {
             getAuthorizer().addAcls(toImmutableScalaSet(acls), resource);
-        } catch (ZkException | IllegalStateException e) {
+        } catch (ZkException | ZooKeeperClientException | IllegalStateException e) {
             throw new AdminOperationException("Unable to add ACLs for resource: " + resource, e);
         }
     }
@@ -398,7 +404,7 @@ public class KafkaAdminClient implements Closeable {
 
         try {
             getAuthorizer().removeAcls(toImmutableScalaSet(acls), resource);
-        } catch (ZkException e) {
+        } catch (ZkException | ZooKeeperClientException e) {
             throw new AdminOperationException("Unable to remove ACLs for resource: " + resource, e);
         }
     }
@@ -475,7 +481,7 @@ public class KafkaAdminClient implements Closeable {
 
         try {
             AdminUtils.createTopic(zkUtils, topic, partitions, replicationFactor, topicConfig, RackAwareMode.Disabled$.MODULE$);
-        } catch (ZkException e) {
+        } catch (ZkException | ZooKeeperClientException e) {
             throw new AdminOperationException("Unable to create topic: " + topic, e);
         }
 
@@ -536,7 +542,7 @@ public class KafkaAdminClient implements Closeable {
             LOG.warn("Topic [{}] is already marked for deletion", topic, e);
         } catch (UnknownTopicOrPartitionException e) {
             LOG.warn("Topic [{}] to be deleted was not found", topic, e);
-        } catch (ZkException e) {
+        } catch (ZkException | ZooKeeperClientException e) {
             throw new AdminOperationException("Unable to delete topic: " + topic, e);
         }
     }
@@ -560,7 +566,7 @@ public class KafkaAdminClient implements Closeable {
 
         try {
             return AdminUtils.fetchEntityConfig(zkUtils, ConfigType.Topic(), topic);
-        } catch (ZkException | KafkaException | IllegalArgumentException e) {
+        } catch (ZkException | ZooKeeperClientException | KafkaException | IllegalArgumentException e) {
             throw new AdminOperationException("Unable to retrieve configuration for topic: " + topic, e);
         }
     }
@@ -588,7 +594,7 @@ public class KafkaAdminClient implements Closeable {
 
         try {
             AdminUtils.changeTopicConfig(zkUtils, topic, properties);
-        } catch (ZkException e) {
+        } catch (ZkException | ZooKeeperClientException e) {
             throw new AdminOperationException("Unable to update configuration for topic: " + topic, e);
         }
     }
@@ -611,7 +617,7 @@ public class KafkaAdminClient implements Closeable {
 
         try {
             return convertToJavaSet(zkUtils.getReplicasForPartition(topic, 0).iterator()).size();
-        } catch (ZkException | KafkaException e) {
+        } catch (ZkException | ZooKeeperClientException | KafkaException e) {
             throw new AdminOperationException("Unable to read replication factor for topic: " + topic, e);
         }
     }
@@ -636,7 +642,7 @@ public class KafkaAdminClient implements Closeable {
         Map<String, Seq<Object>> javaMap;
         try {
             javaMap = convertToJavaMap(zkUtils.getPartitionsForTopics(new Set1<String>(topic).toSeq()).iterator());
-        } catch (ZkException | KafkaException e) {
+        } catch (ZkException | ZooKeeperClientException | KafkaException e) {
             throw new AdminOperationException("Unable to retrieve number of partitions for topic: " + topic, e);
         }
 
@@ -675,16 +681,13 @@ public class KafkaAdminClient implements Closeable {
         LOG.debug("Adding topic partitions for topic [{}] with partitions [{}]", topic, partitions);
 
         try {
-            // Argument 4 is replica assignment. We pass "" to tell Kafka to come up with its own assignments for the new
-            // partitions
-            // Argument 5 is to check if the assigned broker replica is available
-            AdminUtils.addPartitions(zkUtils, topic, partitions, "", true, RackAwareMode.Enforced$.MODULE$);
-        } catch (ZkException e) {
+            getNewAdminClient().createPartitions(Collections.singletonMap(topic, NewPartitions.increaseTo(partitions)));
+        } catch (ZkException | ZooKeeperClientException e) {
             throw new AdminOperationException("Unable to add partitions to topic: " + topic, e);
         }
 
         long start = System.currentTimeMillis();
-        boolean operationCompleted = false;
+        boolean operationCompleted;
 
         do {
             LOG.debug("Sleeping for {} ms for add topic partition operation to complete for topic [{}]", operationSleep,
@@ -702,7 +705,9 @@ public class KafkaAdminClient implements Closeable {
     }
 
     /**
-     * Retrieves the {@link AdminClient.ConsumerGroupSummary} information from Kafka
+     * Retrieves the {@link AdminClient.ConsumerGroupSummary} information from Kafka. If the specified group is not found then the
+     * returned summary will have a {@link AdminClient.ConsumerGroupSummary#state()} of
+     * {@link org.apache.kafka.common.ConsumerGroupState#DEAD}{@code .toString()}, no exception will be thrown in that case.
      *
      * @param consumerGroup
      *      the name of the consumer group
@@ -715,7 +720,7 @@ public class KafkaAdminClient implements Closeable {
             throw new IllegalArgumentException("consumerGroup cannot be null, empty or blank");
 
         try {
-            return getAdminClient().describeConsumerGroup(consumerGroup);
+            return getAdminClient().describeConsumerGroup(consumerGroup, operationTimeout);
         } catch (KafkaException e) {
             throw new AdminOperationException("Unable to retrieve summary for consumer group: " + consumerGroup, e);
         }
@@ -741,13 +746,9 @@ public class KafkaAdminClient implements Closeable {
         AdminClient.ConsumerGroupSummary summary;
 
         try {
-            // this will throw IAE if the consumer group is dead/empty and GroupCoordinatorNotAvailableException if the group is
-            // re-balancing / initializing
-
-            // We can't call the getConsumerGroupSummary(..) above as it would wrap the GroupCoordinatorNotAvailableException and
-            // we wouldn't handle it properly here
-            summary = getAdminClient().describeConsumerGroup(consumerGroup);
-        } catch (IllegalArgumentException | GroupCoordinatorNotAvailableException e) {
+            // this will throw IAE if the consumer group is dead/empty
+            summary = getAdminClient().describeConsumerGroup(consumerGroup, operationTimeout);
+        } catch (IllegalArgumentException e) {
             LOG.debug("Error while attempting to describe consumer group {}", consumerGroup, e);
             return Collections.emptyList();
         } catch (KafkaException e) {
@@ -795,6 +796,13 @@ public class KafkaAdminClient implements Closeable {
         return adminClient;
     }
 
+    private org.apache.kafka.clients.admin.AdminClient getNewAdminClient() {
+        if (newAdminClient == null)
+            newAdminClient = org.apache.kafka.clients.admin.AdminClient.create(properties);
+
+        return newAdminClient;
+    }
+
     @Override
     public void close() {
         zkUtils.close();
@@ -804,6 +812,9 @@ public class KafkaAdminClient implements Closeable {
 
         if (adminClient != null)
             adminClient.close();
+
+        if (newAdminClient != null)
+            newAdminClient.close();
     }
 
     private boolean operationTimedOut(long start) {

@@ -75,7 +75,7 @@ public class KafkaSinkTask extends SinkTask {
             if (sinkRecord.keySchema() != Schema.OPTIONAL_BYTES_SCHEMA || sinkRecord.valueSchema() != Schema.OPTIONAL_BYTES_SCHEMA)
                 throw new IllegalStateException("Expected sink record key/value to be optional bytes, but saw instead key: "
                         + sinkRecord.keySchema() + " value: " + sinkRecord.valueSchema() + ". Must use converter: " +
-                        ByteArrayConverter.class.getName());
+                        "org.apache.kafka.connect.converters.ByteArrayConverter");
 
             LOGGER.debug("Sending record {}", sinkRecord);
 

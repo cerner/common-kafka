@@ -11,6 +11,7 @@ import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertThat;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -21,7 +22,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
-import com.cerner.common.kafka.testing.ZkStringSerializer;
 import com.cerner.common.kafka.testing.ZookeeperTestHarness;
 import kafka.admin.AdminClient;
 import kafka.admin.AdminOperationException;
@@ -32,6 +32,7 @@ import org.I0Itec.zkclient.ZkConnection;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.ConsumerGroupState;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.InvalidReplicationFactorException;
 import org.apache.kafka.common.errors.InvalidTopicException;
@@ -87,6 +88,8 @@ public class KafkaAdminClientTest {
         Properties props = new Properties();
         props.setProperty(ZKConfig.ZkConnectProp(), zkConnect);
         props.setProperty(ZKConfig.ZkConnectionTimeoutMsProp(), String.valueOf(zkConnectTimeoutMs));
+        props.setProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG,
+            KafkaTests.getProps().getProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG));
 
         ZkConnection zkConnection = new ZkConnection(zkConnect);
         ZkClient zkClient = new ZkClient(zkConnection, zkConnectTimeoutMs, new ZkStringSerializer(), zkRetryMs);
@@ -707,7 +710,7 @@ public class KafkaAdminClientTest {
 
         try (Consumer<Object, Object> consumer = new KafkaConsumer<>(properties)) {
             consumer.subscribe(Arrays.asList(testName.getMethodName()));
-            consumer.poll(0L);
+            consumer.poll(Duration.ofSeconds(5L));
 
             AdminClient.ConsumerGroupSummary summary = client.getConsumerGroupSummary(testName.getMethodName());
             assertThat("Expected only 1 consumer summary when getConsumerGroupSummaries(" + testName.getMethodName() + ")",
@@ -719,9 +722,10 @@ public class KafkaAdminClientTest {
         }
     }
 
-    @Test (expected = AdminOperationException.class)
+    @Test
     public void getConsumerGroupSummary_doesNotExist() {
-        failureClient.getConsumerGroupSummary("consumer-group-does-not-exist");
+        AdminClient.ConsumerGroupSummary summary = failureClient.getConsumerGroupSummary("consumer-group-does-not-exist");
+        assertThat(summary.state(), is(ConsumerGroupState.DEAD.toString()));
     }
 
     @Test (expected = IllegalArgumentException.class)
@@ -752,7 +756,7 @@ public class KafkaAdminClientTest {
 
         try (Consumer<Object, Object> consumer = new KafkaConsumer<>(properties)) {
             consumer.subscribe(Arrays.asList(testName.getMethodName()));
-            consumer.poll(0L);
+            consumer.poll(Duration.ofSeconds(5L));
 
             Collection<AdminClient.ConsumerSummary> summaries = client.getConsumerGroupSummaries(testName.getMethodName());
             assertThat("Expected only 1 consumer summary when getConsumerGroupSummaries(" + testName.getMethodName() + ")",
@@ -780,7 +784,7 @@ public class KafkaAdminClientTest {
 
         try (Consumer<Object, Object> consumer = new KafkaConsumer<>(properties)) {
             consumer.subscribe(Arrays.asList(testName.getMethodName()));
-            consumer.poll(0L);
+            consumer.poll(Duration.ofSeconds(5L));
 
             client.getConsumerGroupSummaries(testName.getMethodName()).clear();
         }
@@ -790,11 +794,6 @@ public class KafkaAdminClientTest {
     public void getConsumerGroupSummaries_consumerGroupDoesNotExist() {
         assertThat("expected consumer group summaries to be empty for group that does not exist is not empty",
                 client.getConsumerGroupSummaries("does-not-exist").isEmpty(), is(true));
-    }
-
-    @Test (expected = AdminOperationException.class)
-    public void getConsumerGroupSummaries_zkException() {
-        failureClient.getConsumerGroupSummaries(topic);
     }
 
     @Test (expected = IllegalArgumentException.class)
@@ -825,7 +824,7 @@ public class KafkaAdminClientTest {
 
         try (Consumer<Object, Object>  consumer = new KafkaConsumer<>(properties)) {
             consumer.subscribe(Arrays.asList(testName.getMethodName()));
-            consumer.poll(0L);
+            consumer.poll(Duration.ofSeconds(5L));
 
             assertThat(client.getConsumerGroupAssignments(testName.getMethodName()),
                     is(Collections.singletonMap(new TopicPartition(testName.getMethodName(), 0),
@@ -846,7 +845,7 @@ public class KafkaAdminClientTest {
 
         try (Consumer<Object, Object> consumer = new KafkaConsumer<>(properties)) {
             consumer.subscribe(Arrays.asList(testName.getMethodName()));
-            consumer.poll(0L);
+            consumer.poll(Duration.ofSeconds(5L));
 
             client.getConsumerGroupAssignments(testName.getMethodName()).clear();
         }
@@ -855,10 +854,5 @@ public class KafkaAdminClientTest {
     @Test
     public void getConsumerGroupAssignments_consumerGroupDoesNotExist() {
         assertThat(client.getConsumerGroupAssignments("does-not-exist"), is(Collections.emptyMap()));
-    }
-
-    @Test (expected = AdminOperationException.class)
-    public void getConsumerGroupAssignments_zkException() {
-        failureClient.getConsumerGroupAssignments(topic);
     }
 }

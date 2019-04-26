@@ -187,7 +187,8 @@ public class ConsumerOffsetClient implements Closeable {
      * Commits the {@code offsets}.
      *
      * @param offsets the offsets to commit.
-     * @throws IllegalArgumentException if the {@code offsets} are {@code null}.
+     * @throws IllegalArgumentException if the {@code offsets} are {@code null} or contains a negative value.
+     * @throws NullPointerException if the {@code offsets} contains a {@code null} value
      * @throws org.apache.kafka.common.KafkaException
      *      if there is an issue committing the offsets
      */

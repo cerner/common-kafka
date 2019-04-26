@@ -1,10 +1,9 @@
-package com.cerner.common.kafka.testing;
+package com.cerner.common.kafka.admin;
 
+import org.I0Itec.zkclient.exception.ZkMarshallingError;
 import org.I0Itec.zkclient.serialize.ZkSerializer;
 
 import java.nio.charset.Charset;
-
-import org.I0Itec.zkclient.exception.ZkMarshallingError;
 
 /**
  * A {@link ZkSerializer Zookeeper serializer} for {@link String} objects.
