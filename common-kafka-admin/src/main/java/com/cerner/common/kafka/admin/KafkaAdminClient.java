@@ -54,6 +54,7 @@ import java.util.stream.Collectors;
  * @author Bryan Baugher
  * @deprecated Use Kafka's new AdminClient
  */
+@Deprecated
 public class KafkaAdminClient implements Closeable {
 
     /**
