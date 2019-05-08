@@ -7,6 +7,8 @@ operations.
 
 ### [KafkaAdminClient](src/main/java/com/cerner/common/kafka/admin/KafkaAdminClient.java)
 
+Deprecated in favor of Kafka's new [AdminClient](https://github.com/apache/kafka/blob/trunk/clients/src/main/java/org/apache/kafka/clients/admin/AdminClient.java).
+
 * Wraps Kafka resource administration functionality including the following capabilities:
   * Topic creation and deletion
   * Topic and partition inventory
