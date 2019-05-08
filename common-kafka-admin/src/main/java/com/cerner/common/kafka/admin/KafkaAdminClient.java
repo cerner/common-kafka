@@ -482,8 +482,14 @@ public class KafkaAdminClient implements Closeable {
         LOG.debug("Creating topic [{}] with partitions [{}] and replication factor [{}] and topic config [{}]",
                  topic, partitions, replicationFactor, topicConfig );
 
+
+        Map<String, String> topicProps = new HashMap<>();
+        topicConfig.stringPropertyNames().stream()
+            .forEach(propName -> topicProps.put(propName, topicConfig.getProperty(propName)));
+
+
         try {
-            NewTopic newTopic = new NewTopic(topic, partitions, (short) replicationFactor);
+            NewTopic newTopic = new NewTopic(topic, partitions, (short) replicationFactor).configs(topicProps);
 
             getNewAdminClient()
                 .createTopics(Collections.singleton(newTopic))
@@ -513,8 +519,6 @@ public class KafkaAdminClient implements Closeable {
 
         if (!operationCompleted)
             throw new AdminOperationException("Timeout waiting for topic " + topic + " to be created");
-
-        updateTopicConfig(topic, topicConfig);
     }
 
     /**
