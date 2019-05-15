@@ -70,7 +70,7 @@
 
   <properties>
     <hamcrest.version>1.3</hamcrest.version>
-    <jackson.version>2.8.11.3</jackson.version>
+    <jackson.version>2.9.8</jackson.version>
     <kafka.version>2.2.0</kafka.version>
     <scala.major.version>2.12</scala.major.version>
     <scala.version>${scala.major.version}.8</scala.version>
@@ -78,8 +78,8 @@
     <log4j.version>1.2.17</log4j.version>
     <jdk.version>1.8</jdk.version>
     <metrics.version>2.2.0</metrics.version>
-
     <wagon.version>2.12</wagon.version>
+    <zookeeper.version>3.4.14</zookeeper.version>
 
     <scm.url>http://github.com/Cerner/common-kafka/tree/${project.version}</scm.url>
     <findbugs.excludes.location>${project.basedir}/src/etc/findbugs-exclude.xml</findbugs.excludes.location>
@@ -150,7 +150,7 @@
       <dependency>
         <groupId>org.apache.zookeeper</groupId>
         <artifactId>zookeeper</artifactId>
-        <version>3.4.9</version>
+        <version>${zookeeper.version}</version>
         <exclusions>
           <exclusion>
             <groupId>org.slf4j</groupId>
