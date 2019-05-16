@@ -95,7 +95,8 @@ public class KafkaAdminClientTest {
         ZkClient zkClient = new ZkClient(zkConnection, zkConnectTimeoutMs, new ZkStringSerializer(), zkRetryMs);
 
         // Establish a connection while the temporary ZK is still running.
-        failureClient = new KafkaAdminClient(props, new ZkUtils(zkClient, zkConnection, false));
+        failureClient = new KafkaAdminClient(props);
+        failureClient.zkUtils = new ZkUtils(zkClient, zkConnection, false);
 
         // Kill the temporary ZK, we no longer need it.
         zk.tearDown();
@@ -126,13 +127,6 @@ public class KafkaAdminClientTest {
         client.close();
     }
 
-    @Test(expected = AdminOperationException.class)
-    public void constructor_zkException() {
-        Properties props = new Properties();
-        props.setProperty(ZKConfig.ZkConnectProp(), "some_invalid_host:7777");
-        new KafkaAdminClient(props);
-    }
-
     @Test(expected = IllegalArgumentException.class)
     public void constructorProperties_nullProperties() {
         new KafkaAdminClient(null);
@@ -158,7 +152,7 @@ public class KafkaAdminClientTest {
     public void constructorProperties_defaultConfig() {
         assertThat(client.operationTimeout, is(Long.parseLong(KafkaAdminClient.DEFAULT_OPERATION_TIMEOUT_MS)));
         assertThat(client.operationSleep, is(Long.parseLong(KafkaAdminClient.DEFAULT_OPERATION_SLEEP_MS)));
-        assertThat(client.zkUtils.isSecure(), is(false));
+        assertThat(client.getZkUtils().isSecure(), is(false));
     }
 
     @Test
@@ -170,7 +164,7 @@ public class KafkaAdminClientTest {
         try (KafkaAdminClient adminClient = new KafkaAdminClient(properties)) {
             assertThat(adminClient.operationTimeout, is(123L));
             assertThat(adminClient.operationSleep, is(321L));
-            assertThat(adminClient.zkUtils.isSecure(), is(true));
+            assertThat(adminClient.getZkUtils().isSecure(), is(true));
         }
     }
 
@@ -262,6 +256,13 @@ public class KafkaAdminClientTest {
     @Test(expected = AdminOperationException.class)
     public void getTopics_zkException() {
         failureClient.getTopics();
+    }
+
+    @Test(expected = AdminOperationException.class)
+    public void getTopics_zkConnectException() {
+        Properties props = new Properties();
+        props.setProperty(ZKConfig.ZkConnectProp(), "some_invalid_host:7777");
+        new KafkaAdminClient(props).getTopics();
     }
 
     @Test
