@@ -3,7 +3,6 @@ package com.cerner.common.kafka.admin;
 import kafka.admin.AdminClient;
 import kafka.admin.AdminOperationException;
 import kafka.admin.AdminUtils;
-import kafka.admin.RackAwareMode;
 import kafka.common.TopicAlreadyMarkedForDeletionException;
 import kafka.common.TopicAndPartition;
 import kafka.security.auth.Acl;
@@ -21,6 +20,7 @@ import org.I0Itec.zkclient.exception.ZkException;
 import org.I0Itec.zkclient.exception.ZkNoNodeException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.admin.NewPartitions;
+import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.UnknownTopicOrPartitionException;
@@ -42,6 +42,9 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 /**
@@ -481,9 +484,25 @@ public class KafkaAdminClient implements Closeable {
         LOG.debug("Creating topic [{}] with partitions [{}] and replication factor [{}] and topic config [{}]",
                  topic, partitions, replicationFactor, topicConfig );
 
+
+        Map<String, String> topicProps = new HashMap<>();
+        topicConfig.stringPropertyNames().stream()
+            .forEach(propName -> topicProps.put(propName, topicConfig.getProperty(propName)));
+
+
         try {
-            AdminUtils.createTopic(zkUtils, topic, partitions, replicationFactor, topicConfig, RackAwareMode.Disabled$.MODULE$);
-        } catch (ZkException | ZooKeeperClientException e) {
+            NewTopic newTopic = new NewTopic(topic, partitions, (short) replicationFactor).configs(topicProps);
+
+            getNewAdminClient()
+                .createTopics(Collections.singleton(newTopic))
+                .all().get(operationTimeout, TimeUnit.MILLISECONDS);
+        } catch (ExecutionException ee) {
+            Throwable throwable = ee.getCause();
+            if (throwable instanceof KafkaException) {
+                throw (KafkaException) throwable;
+            }
+            throw new AdminOperationException("Unable to create topic: " + topic, ee);
+        } catch (ZkException | ZooKeeperClientException | InterruptedException | TimeoutException e) {
             throw new AdminOperationException("Unable to create topic: " + topic, e);
         }
 
