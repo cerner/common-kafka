@@ -99,7 +99,7 @@ public class KafkaAdminClient implements Closeable {
     /**
      * Zookeeper client used to talk to Kafka
      */
-    protected final ZkUtils zkUtils;
+    protected ZkUtils zkUtils = null;
 
     /**
      * The properties used to configure the client
@@ -143,18 +143,15 @@ public class KafkaAdminClient implements Closeable {
      *     <li>if the property for {@link #OPERATION_TIMEOUT_MS} is not a number or less than zero</li>
      *     <li>if the property for {@link #OPERATION_SLEEP_MS} is not a number or less than zero</li>
      * </ul>
-     *
-     * @throws AdminOperationException
-     *      if the admin client cannot successfully establish a connection
      */
     public KafkaAdminClient(Properties properties) {
-        this(properties, getZkUtils(properties));
-    }
+        if (properties == null)
+            throw new IllegalArgumentException("properties cannot be null");
 
-    // Visible for testing
-    KafkaAdminClient(Properties properties, ZkUtils zkUtils) {
+        if (properties.getProperty(ZKConfig.ZkConnectProp()) == null)
+            throw new IllegalArgumentException("missing required property: " + ZKConfig.ZkConnectProp());
+
         this.properties = properties;
-        this.zkUtils = zkUtils;
         this.operationTimeout = parseLong(properties, OPERATION_TIMEOUT_MS, DEFAULT_OPERATION_TIMEOUT_MS);
         this.operationSleep = parseLong(properties, OPERATION_SLEEP_MS, DEFAULT_OPERATION_SLEEP_MS);
 
@@ -165,21 +162,23 @@ public class KafkaAdminClient implements Closeable {
             throw new IllegalArgumentException("operationSleep cannot be < 0");
     }
 
-    private static ZkUtils getZkUtils(Properties properties) {
-        if (properties == null)
-            throw new IllegalArgumentException("properties cannot be null");
-
-        Tuple2<ZkClient, ZkConnection> tuple;
-        try {
-            ZKConfig zkConfig = new ZKConfig(new VerifiableProperties(properties));
-            tuple = ZkUtils.createZkClientAndConnection(zkConfig.zkConnect(), zkConfig.zkSessionTimeoutMs(),
+    // Visible for testing
+    ZkUtils getZkUtils() {
+        if (zkUtils == null) {
+            Tuple2<ZkClient, ZkConnection> tuple;
+            try {
+                ZKConfig zkConfig = new ZKConfig(new VerifiableProperties(properties));
+                tuple = ZkUtils.createZkClientAndConnection(zkConfig.zkConnect(), zkConfig.zkSessionTimeoutMs(),
                     zkConfig.zkConnectionTimeoutMs());
-        } catch (ZkException | ZooKeeperClientException e) {
-            throw new AdminOperationException("Unable to create admin connection", e);
+            } catch (ZkException | ZooKeeperClientException e) {
+                throw new AdminOperationException("Unable to create admin connection", e);
+            }
+
+            boolean isSecure = Boolean.valueOf(properties.getProperty(ZOOKEEPER_SECURE, DEFAULT_ZOOKEEPER_SECURE));
+            zkUtils = new ZkUtils(tuple._1(), tuple._2(), isSecure);
         }
 
-        boolean isSecure = Boolean.valueOf(properties.getProperty(ZOOKEEPER_SECURE, DEFAULT_ZOOKEEPER_SECURE));
-        return new ZkUtils(tuple._1(), tuple._2(), isSecure);
+        return zkUtils;
     }
 
     private static long parseLong(Properties properties, String property, String defaultValue) {
@@ -203,7 +202,7 @@ public class KafkaAdminClient implements Closeable {
     public Set<String> getTopics() {
         LOG.debug("Retrieving all topics");
         try {
-            return Collections.unmodifiableSet(convertToJavaSet(zkUtils.getAllTopics().iterator()));
+            return Collections.unmodifiableSet(convertToJavaSet(getZkUtils().getAllTopics().iterator()));
         } catch (ZkException | ZooKeeperClientException e) {
             throw new AdminOperationException("Unable to retrieve all topics", e);
         }
@@ -225,7 +224,7 @@ public class KafkaAdminClient implements Closeable {
             // zookeeper but the topic is listed in zookeeper. Any other zookeeper exception is assumed to be non-transient and
             // will be rethrown.
             try {
-                return Collections.unmodifiableSet(convertToJavaSet(zkUtils.getAllPartitions().iterator()));
+                return Collections.unmodifiableSet(convertToJavaSet(getZkUtils().getAllPartitions().iterator()));
             } catch (ZkNoNodeException e) {
                 LOG.debug("Reading partitions had an error", e);
             } catch (ZkException | ZooKeeperClientException e) {
@@ -541,7 +540,7 @@ public class KafkaAdminClient implements Closeable {
         LOG.debug("Deleting topic [{}]", topic);
 
         try {
-            AdminUtils.deleteTopic(zkUtils, topic);
+            AdminUtils.deleteTopic(getZkUtils(), topic);
 
             long start = System.currentTimeMillis();
             boolean operationCompleted = false;
@@ -637,7 +636,7 @@ public class KafkaAdminClient implements Closeable {
             throw new IllegalArgumentException("topic cannot be null, empty or blank");
 
         try {
-            return convertToJavaSet(zkUtils.getReplicasForPartition(topic, 0).iterator()).size();
+            return convertToJavaSet(getZkUtils().getReplicasForPartition(topic, 0).iterator()).size();
         } catch (ZkException | ZooKeeperClientException | KafkaException e) {
             throw new AdminOperationException("Unable to read replication factor for topic: " + topic, e);
         }
@@ -662,7 +661,7 @@ public class KafkaAdminClient implements Closeable {
 
         Map<String, Seq<Object>> javaMap;
         try {
-            javaMap = convertToJavaMap(zkUtils.getPartitionsForTopics(new Set1<String>(topic).toSeq()).iterator());
+            javaMap = convertToJavaMap(getZkUtils().getPartitionsForTopics(new Set1<>(topic).toSeq()).iterator());
         } catch (ZkException | ZooKeeperClientException | KafkaException e) {
             throw new AdminOperationException("Unable to retrieve number of partitions for topic: " + topic, e);
         }
@@ -826,7 +825,8 @@ public class KafkaAdminClient implements Closeable {
 
     @Override
     public void close() {
-        zkUtils.close();
+        if (zkUtils != null)
+            zkUtils.close();
 
         if (authorizer != null)
             authorizer.close();
