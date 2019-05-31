@@ -48,7 +48,7 @@ public class ZookeeperTestHarness {
     public ZookeeperTestHarness(int zookeeperPort) {
         this.zookeeper = null;
         this.zkUtils = null;
-        this.zkConnectionTimeout = 6000;
+        this.zkConnectionTimeout = 30000;
         this.zkSessionTimeout = 6000;
         this.zookeeperConnect = "localhost:" + zookeeperPort;
     }
