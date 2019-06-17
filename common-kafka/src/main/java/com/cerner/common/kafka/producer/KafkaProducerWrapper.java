@@ -1,6 +1,10 @@
 package com.cerner.common.kafka.producer;
 
 import com.cerner.common.kafka.KafkaExecutionException;
+import com.yammer.metrics.Metrics;
+import com.yammer.metrics.core.Histogram;
+import com.yammer.metrics.core.Timer;
+import com.yammer.metrics.core.TimerContext;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
@@ -126,6 +130,26 @@ public class KafkaProducerWrapper<K, T> implements Closeable, Flushable {
     private final List<Future<RecordMetadata>> pendingWrites;
 
     /**
+     * A timer for {@link #send(ProducerRecord)} calls
+     */
+    static final Timer SEND_TIMER = Metrics.newTimer(KafkaProducerWrapper.class, "send");
+
+    /**
+     * A timer for {@link #sendSynchronously(ProducerRecord)} or {@link #sendSynchronously(List)} calls
+     */
+    static final Timer SYNC_SEND_TIMER = Metrics.newTimer(KafkaProducerWrapper.class, "send-synchronously");
+
+    /**
+     * A timer for {@link #flush()} calls
+     */
+    static final Timer FLUSH_TIMER = Metrics.newTimer(KafkaProducerWrapper.class, "flush");
+
+    /**
+     * A histogram tracking batch size, updated by {@link #sendSynchronously(List)} or {@link #flush()}
+     */
+    static final Histogram BATCH_SIZE_HISTOGRAM = Metrics.newHistogram(KafkaProducerWrapper.class, "batch-size", true);
+
+    /**
      * Creates an instance to manage interacting with the {@code kafkaProducer}.
      *
      * @param kafkaProducer
@@ -151,7 +175,13 @@ public class KafkaProducerWrapper<K, T> implements Closeable, Flushable {
         if(record == null){
             throw new IllegalArgumentException("The 'record' cannot be 'null'.");
         }
-        pendingWrites.add(kafkaProducer.send(record));
+
+        TimerContext context = SEND_TIMER.time();
+        try {
+            pendingWrites.add(kafkaProducer.send(record));
+        } finally {
+            context.stop();
+        }
     }
 
     /**
@@ -187,9 +217,16 @@ public class KafkaProducerWrapper<K, T> implements Closeable, Flushable {
             return;
         }
 
-        List<Future<RecordMetadata>> futures = records.stream().map(kafkaProducer::send).collect(Collectors.toList());
+        BATCH_SIZE_HISTOGRAM.update(records.size());
 
-        handlePendingWrites(futures);
+        TimerContext context = SYNC_SEND_TIMER.time();
+        try {
+            List<Future<RecordMetadata>> futures = records.stream().map(kafkaProducer::send).collect(Collectors.toList());
+
+            handlePendingWrites(futures);
+        } finally {
+            context.stop();
+        }
     }
 
     /**
@@ -203,10 +240,19 @@ public class KafkaProducerWrapper<K, T> implements Closeable, Flushable {
      */
     @Override
     public void flush() throws IOException{
+        if (pendingWrites.isEmpty()) {
+            LOGGER.debug("nothing to flush");
+            return;
+        }
+
+        BATCH_SIZE_HISTOGRAM.update(pendingWrites.size());
+
+        TimerContext context = FLUSH_TIMER.time();
         try {
             handlePendingWrites(pendingWrites);
         } finally{
             pendingWrites.clear();
+            context.stop();
         }
     }
 

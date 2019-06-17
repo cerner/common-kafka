@@ -95,6 +95,11 @@ public class KafkaProducerWrapperTest {
 
     @Test
     public void test_messageSentSynchronouslySuccessfully() throws IOException {
+        long previousSendCount = KafkaProducerWrapper.SEND_TIMER.count();
+        long previousSyncSendCount = KafkaProducerWrapper.SYNC_SEND_TIMER.count();
+        long previousFlushCount = KafkaProducerWrapper.FLUSH_TIMER.count();
+        long previousBatchSizeCount = KafkaProducerWrapper.BATCH_SIZE_HISTOGRAM.count();
+        double previousBatchSizeSum = KafkaProducerWrapper.BATCH_SIZE_HISTOGRAM.sum();
 
         kafkaAdminClient.createTopic(topic, 4, 1, new Properties());
 
@@ -109,8 +114,47 @@ public class KafkaProducerWrapperTest {
         producer.sendSynchronously(
                 new ProducerRecord<>(topic, "key"+testName.getMethodName(), "value"+ UUID.randomUUID()));
         producer.close();
+
+        assertThat(KafkaProducerWrapper.SEND_TIMER.count(), is(previousSendCount));
+        assertThat(KafkaProducerWrapper.SYNC_SEND_TIMER.count(), is(previousSyncSendCount + 1));
+        assertThat(KafkaProducerWrapper.FLUSH_TIMER.count(), is(previousFlushCount));
+        assertThat(KafkaProducerWrapper.BATCH_SIZE_HISTOGRAM.count(), is(previousBatchSizeCount + 1));
+        assertThat(KafkaProducerWrapper.BATCH_SIZE_HISTOGRAM.sum(), is(previousBatchSizeSum + 1));
     }
 
+    @Test
+    public void test_multipleMessagesSentSynchronouslySuccessfully() throws IOException {
+        long previousSendCount = KafkaProducerWrapper.SEND_TIMER.count();
+        long previousSyncSendCount = KafkaProducerWrapper.SYNC_SEND_TIMER.count();
+        long previousFlushCount = KafkaProducerWrapper.FLUSH_TIMER.count();
+        long previousBatchSizeCount = KafkaProducerWrapper.BATCH_SIZE_HISTOGRAM.count();
+        double previousBatchSizeSum = KafkaProducerWrapper.BATCH_SIZE_HISTOGRAM.sum();
+
+        kafkaAdminClient.createTopic(topic, 4, 1, new Properties());
+
+        Properties props = KafkaTests.getProps();
+        props.setProperty(KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+        props.setProperty(VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+        props.setProperty(ProducerConfig.BATCH_SIZE_CONFIG, "10000");
+        props.setProperty(ProducerConfig.LINGER_MS_CONFIG, "60000");
+
+        int batchSize = 10;
+        KafkaProducerWrapper<String, String> producer = new KafkaProducerWrapper<>(new KafkaProducer<>(props));
+
+        List<ProducerRecord<String, String>> records = new ArrayList<>();
+
+        IntStream.range(0, batchSize).forEach(i ->
+            records.add(new ProducerRecord<>(topic, "key"+testName.getMethodName()+i, "value"+i)));
+
+        producer.sendSynchronously(records);
+        producer.close();
+
+        assertThat(KafkaProducerWrapper.SEND_TIMER.count(), is(previousSendCount));
+        assertThat(KafkaProducerWrapper.SYNC_SEND_TIMER.count(), is(previousSyncSendCount + 1));
+        assertThat(KafkaProducerWrapper.FLUSH_TIMER.count(), is(previousFlushCount));
+        assertThat(KafkaProducerWrapper.BATCH_SIZE_HISTOGRAM.count(), is(previousBatchSizeCount + 1));
+        assertThat(KafkaProducerWrapper.BATCH_SIZE_HISTOGRAM.sum(), is(previousBatchSizeSum + batchSize));
+    }
 
     @Test(expected=IOException.class)
     public void test_flushRetriable() throws IOException {
@@ -148,6 +192,12 @@ public class KafkaProducerWrapperTest {
 
     @Test
     public void test_messageSentSuccessfully() throws IOException {
+        long previousSendCount = KafkaProducerWrapper.SEND_TIMER.count();
+        long previousSyncSendCount = KafkaProducerWrapper.SYNC_SEND_TIMER.count();
+        long previousFlushCount = KafkaProducerWrapper.FLUSH_TIMER.count();
+        long previousBatchSizeCount = KafkaProducerWrapper.BATCH_SIZE_HISTOGRAM.count();
+        double previousBatchSizeSum = KafkaProducerWrapper.BATCH_SIZE_HISTOGRAM.sum();
+
         kafkaAdminClient.createTopic(topic, 4, 1, new Properties());
 
         Properties props = KafkaTests.getProps();
@@ -161,19 +211,38 @@ public class KafkaProducerWrapperTest {
         producer.send(new ProducerRecord<>(topic, "key"+testName.getMethodName(), "value"+UUID.randomUUID()));
         producer.flush();
         producer.close();
+
+        assertThat(KafkaProducerWrapper.SEND_TIMER.count(), is(previousSendCount + 1));
+        assertThat(KafkaProducerWrapper.SYNC_SEND_TIMER.count(), is(previousSyncSendCount));
+        assertThat(KafkaProducerWrapper.FLUSH_TIMER.count(), is(previousFlushCount + 1));
+        assertThat(KafkaProducerWrapper.BATCH_SIZE_HISTOGRAM.count(), is(previousBatchSizeCount + 1));
+        assertThat(KafkaProducerWrapper.BATCH_SIZE_HISTOGRAM.sum(), is(previousBatchSizeSum + 1));
     }
 
     @Test
     public void test_messageSentMultipleSuccessfully() throws IOException, ExecutionException, InterruptedException {
+        long previousSendCount = KafkaProducerWrapper.SEND_TIMER.count();
+        long previousSyncSendCount = KafkaProducerWrapper.SYNC_SEND_TIMER.count();
+        long previousFlushCount = KafkaProducerWrapper.FLUSH_TIMER.count();
+        long previousBatchSizeCount = KafkaProducerWrapper.BATCH_SIZE_HISTOGRAM.count();
+        double previousBatchSizeSum = KafkaProducerWrapper.BATCH_SIZE_HISTOGRAM.sum();
+
+        int batchSize = 10;
         KafkaProducerWrapper<String, String> producer = new KafkaProducerWrapper<>(mockedProducer);
 
-        IntStream.range(0, 10).forEach(i ->
+        IntStream.range(0, batchSize).forEach(i ->
                 producer.send(new ProducerRecord<>(topic, "key"+testName.getMethodName()+i, "value"+i)));
         producer.flush();
 
-        verify(mockedFuture, times(10)).get();
+        verify(mockedFuture, times(batchSize)).get();
 
         producer.close();
+
+        assertThat(KafkaProducerWrapper.SEND_TIMER.count(), is(previousSendCount + batchSize));
+        assertThat(KafkaProducerWrapper.SYNC_SEND_TIMER.count(), is(previousSyncSendCount));
+        assertThat(KafkaProducerWrapper.FLUSH_TIMER.count(), is(previousFlushCount + 1));
+        assertThat(KafkaProducerWrapper.BATCH_SIZE_HISTOGRAM.count(), is(previousBatchSizeCount + 1));
+        assertThat(KafkaProducerWrapper.BATCH_SIZE_HISTOGRAM.sum(), is(previousBatchSizeSum + batchSize));
     }
 
     @Test(expected=IllegalArgumentException.class)
