@@ -8,7 +8,7 @@ If you have never released before you will need to do the following,
 
  * Your user will need access to the maven central repo for our group (`com.cerner.common.kafka`)
    * Create a [JIRA account](https://issues.sonatype.org/secure/Signup!default.jspa)
-   * Log a [ticket](https://issues.sonatype.org/) to get access to the repo
+   * Log a ticket ([like this one](https://issues.sonatype.org/browse/OSSRH-37290)) to get access to the repo. You will need one of the owners of the project to approve the JIRA
  * Install gpg (for Mac `brew install gnupg`)
  * Setup gpg key (http://central.sonatype.org/pages/working-with-pgp-signatures.html)
    * Create new key `gpg --gen-key`. Follow instructions
