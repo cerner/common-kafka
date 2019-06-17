@@ -145,4 +145,8 @@ gpg --full-generate-key
 
 Make sure to select the 'Sign Only' and 'RSA' options. Then follow the same options 
 above to upload your key and verify its on the public key servers and try the 
-release again.
+release again. Release can be started again with,
+
+``` 
+mvn release:perform -P ossrh
+```
