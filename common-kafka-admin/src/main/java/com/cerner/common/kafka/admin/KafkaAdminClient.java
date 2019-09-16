@@ -2,14 +2,11 @@ package com.cerner.common.kafka.admin;
 
 import kafka.admin.AdminClient;
 import kafka.admin.AdminOperationException;
-import kafka.admin.AdminUtils;
-import kafka.common.TopicAlreadyMarkedForDeletionException;
 import kafka.common.TopicAndPartition;
 import kafka.security.auth.Acl;
 import kafka.security.auth.Authorizer;
 import kafka.security.auth.Resource;
 import kafka.security.auth.SimpleAclAuthorizer;
-import kafka.server.ConfigType;
 import kafka.utils.VerifiableProperties;
 import kafka.utils.ZKConfig;
 import kafka.utils.ZkUtils;
@@ -17,28 +14,34 @@ import kafka.zookeeper.ZooKeeperClientException;
 import org.I0Itec.zkclient.ZkClient;
 import org.I0Itec.zkclient.ZkConnection;
 import org.I0Itec.zkclient.exception.ZkException;
-import org.I0Itec.zkclient.exception.ZkNoNodeException;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.kafka.clients.admin.Config;
+import org.apache.kafka.clients.admin.ConfigEntry;
+import org.apache.kafka.clients.admin.ListTopicsOptions;
 import org.apache.kafka.clients.admin.NewPartitions;
 import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.TopicPartitionInfo;
+import org.apache.kafka.common.config.ConfigResource;
+import org.apache.kafka.common.errors.InvalidPartitionsException;
 import org.apache.kafka.common.errors.UnknownTopicOrPartitionException;
 import org.apache.kafka.common.security.auth.KafkaPrincipal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import scala.Tuple2;
 import scala.collection.Iterator;
-import scala.collection.Seq;
-import scala.collection.immutable.Set.Set1;
 import scala.collection.immutable.Set$;
 import scala.collection.mutable.ListBuffer;
 
 import java.io.Closeable;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -202,9 +205,15 @@ public class KafkaAdminClient implements Closeable {
     public Set<String> getTopics() {
         LOG.debug("Retrieving all topics");
         try {
-            return Collections.unmodifiableSet(convertToJavaSet(getZkUtils().getAllTopics().iterator()));
-        } catch (ZkException | ZooKeeperClientException e) {
-            throw new AdminOperationException("Unable to retrieve all topics", e);
+            Set<String> topics = getNewAdminClient()
+                .listTopics(new ListTopicsOptions().listInternal(true))
+                .names().get(operationTimeout, TimeUnit.MILLISECONDS);
+            if (topics.isEmpty()) {
+                LOG.warn("Unable to list Kafka topics");
+            }
+            return Collections.unmodifiableSet(topics);
+        } catch (InterruptedException | ExecutionException | TimeoutException e) {
+            throw new AdminOperationException("Unable to list Kafka topics", e);
         }
     }
 
@@ -217,30 +226,7 @@ public class KafkaAdminClient implements Closeable {
      */
     public Set<TopicAndPartition> getPartitions() {
         LOG.debug("Retrieving all partitions");
-
-        long start = System.currentTimeMillis();
-        do {
-            // The zkUtils.getAllPartitions(..) can throw ZkNoNodeException if a topic's partitions have not been added to
-            // zookeeper but the topic is listed in zookeeper. Any other zookeeper exception is assumed to be non-transient and
-            // will be rethrown.
-            try {
-                return Collections.unmodifiableSet(convertToJavaSet(getZkUtils().getAllPartitions().iterator()));
-            } catch (ZkNoNodeException e) {
-                LOG.debug("Reading partitions had an error", e);
-            } catch (ZkException | ZooKeeperClientException e) {
-                throw new AdminOperationException("Unable to retrieve all partitions", e);
-            }
-
-            LOG.debug("Sleeping for {} ms before trying to get all partitions again", operationSleep);
-            try {
-                Thread.sleep(operationSleep);
-            } catch (InterruptedException e) {
-                throw new AdminOperationException("Interrupted while getting partitions", e);
-            }
-
-        } while (!operationTimedOut(start));
-
-        throw new AdminOperationException("Operation timed out trying to get partitions");
+        return getPartitions(getTopics());
     }
 
     /**
@@ -254,8 +240,30 @@ public class KafkaAdminClient implements Closeable {
      */
     public Set<TopicAndPartition> getPartitions(String topic) {
         LOG.debug("Retrieving all partitions for topic [{}]", topic);
-        return Collections.unmodifiableSet(
-                getPartitions().stream().filter(p -> p.topic().equals(topic)).collect(Collectors.toSet()));
+        return getPartitions(Collections.singleton(topic));
+    }
+
+    private Set<TopicAndPartition> getPartitions(Collection<String> topics) {
+        Set<TopicAndPartition> partitions = new HashSet<>();
+        for (TopicDescription topicDescription : getTopicDescriptions(topics)) {
+            for (TopicPartitionInfo partition : topicDescription.partitions()) {
+                partitions.add(new TopicAndPartition(topicDescription.name(), partition.partition()));
+            }
+        }
+        return Collections.unmodifiableSet(partitions);
+    }
+
+    private Collection<TopicDescription> getTopicDescriptions(Collection<String> topics) {
+        try {
+            Map<String, TopicDescription> topicDescriptions = getNewAdminClient().describeTopics(topics).all()
+                .get(operationTimeout, TimeUnit.MILLISECONDS);
+            if (topics.isEmpty()) {
+                LOG.warn("Unable to describe Kafka topics");
+            }
+            return topicDescriptions.values();
+        } catch (InterruptedException | ExecutionException | TimeoutException e) {
+            throw new AdminOperationException("Unable to describe Kafka topics", e);
+        }
     }
 
     /**
@@ -501,7 +509,7 @@ public class KafkaAdminClient implements Closeable {
                 throw (KafkaException) throwable;
             }
             throw new AdminOperationException("Unable to create topic: " + topic, ee);
-        } catch (ZkException | ZooKeeperClientException | InterruptedException | TimeoutException e) {
+        } catch (InterruptedException | TimeoutException e) {
             throw new AdminOperationException("Unable to create topic: " + topic, e);
         }
 
@@ -540,7 +548,7 @@ public class KafkaAdminClient implements Closeable {
         LOG.debug("Deleting topic [{}]", topic);
 
         try {
-            AdminUtils.deleteTopic(getZkUtils(), topic);
+            getNewAdminClient().deleteTopics(Collections.singleton(topic)).all().get(operationTimeout, TimeUnit.MILLISECONDS);
 
             long start = System.currentTimeMillis();
             boolean operationCompleted = false;
@@ -558,12 +566,13 @@ public class KafkaAdminClient implements Closeable {
             if (!operationCompleted)
                 throw new AdminOperationException("Timeout waiting for topic " + topic + " to be deleted");
 
-        } catch (TopicAlreadyMarkedForDeletionException e) {
-            LOG.warn("Topic [{}] is already marked for deletion", topic, e);
-        } catch (UnknownTopicOrPartitionException e) {
-            LOG.warn("Topic [{}] to be deleted was not found", topic, e);
-        } catch (ZkException | ZooKeeperClientException e) {
-            throw new AdminOperationException("Unable to delete topic: " + topic, e);
+        } catch (InterruptedException | ExecutionException | TimeoutException e) {
+            Throwable throwable = e.getCause();
+            if (throwable instanceof UnknownTopicOrPartitionException) {
+                LOG.warn("Topic [{}] to be deleted was not found", topic, e);
+            } else {
+                throw new AdminOperationException("Unable to delete topic: " + topic, e);
+            }
         }
     }
 
@@ -585,8 +594,23 @@ public class KafkaAdminClient implements Closeable {
         LOG.debug("Fetching topic config for topic [{}]", topic);
 
         try {
-            return AdminUtils.fetchEntityConfig(zkUtils, ConfigType.Topic(), topic);
-        } catch (ZkException | ZooKeeperClientException | KafkaException | IllegalArgumentException e) {
+            ConfigResource resource = new ConfigResource(ConfigResource.Type.TOPIC, topic);
+            Map<ConfigResource, Config> configs = getNewAdminClient()
+                .describeConfigs(Collections.singleton(resource))
+                .all()
+                .get(operationTimeout, TimeUnit.MILLISECONDS);
+            Config config = configs.get(resource);
+            if (config == null) {
+                throw new AdminOperationException("Unable to get topic config: " + topic);
+            }
+
+            Properties properties = new Properties();
+            config.entries().stream()
+                // We are only interested in any overrides that are set
+                .filter(configEntry -> configEntry.source() == ConfigEntry.ConfigSource.DYNAMIC_TOPIC_CONFIG)
+                .forEach(configEntry -> properties.setProperty(configEntry.name(), configEntry.value()));
+            return properties;
+        } catch (InterruptedException | ExecutionException | TimeoutException e) {
             throw new AdminOperationException("Unable to retrieve configuration for topic: " + topic, e);
         }
     }
@@ -613,8 +637,19 @@ public class KafkaAdminClient implements Closeable {
         LOG.debug("Updating topic config for topic [{}] with config [{}]", topic, properties);
 
         try {
-            AdminUtils.changeTopicConfig(zkUtils, topic, properties);
-        } catch (ZkException | ZooKeeperClientException e) {
+            List<ConfigEntry> configEntries = new ArrayList<>();
+            for (String property : properties.stringPropertyNames()) {
+                configEntries.add(new ConfigEntry(property, properties.getProperty(property)));
+            }
+
+            getNewAdminClient()
+                .alterConfigs(
+                    Collections.singletonMap(
+                        new ConfigResource(ConfigResource.Type.TOPIC, topic),
+                        new Config(configEntries)))
+                .all()
+                .get(operationTimeout, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException | ExecutionException | TimeoutException e) {
             throw new AdminOperationException("Unable to update configuration for topic: " + topic, e);
         }
     }
@@ -635,11 +670,19 @@ public class KafkaAdminClient implements Closeable {
         if (StringUtils.isBlank(topic))
             throw new IllegalArgumentException("topic cannot be null, empty or blank");
 
-        try {
-            return convertToJavaSet(getZkUtils().getReplicasForPartition(topic, 0).iterator()).size();
-        } catch (ZkException | ZooKeeperClientException | KafkaException e) {
-            throw new AdminOperationException("Unable to read replication factor for topic: " + topic, e);
+        LOG.debug("Getting replication factor for topic [{}]", topic);
+
+        Collection<TopicDescription> topicDescription = getTopicDescriptions(Collections.singleton(topic));
+        if (topicDescription.isEmpty()) {
+            throw new AdminOperationException("Unable to get description for topic: " + topic);
         }
+
+        List<TopicPartitionInfo> topicPartitions = topicDescription.iterator().next().partitions();
+        if (topicPartitions.isEmpty()) {
+            throw new AdminOperationException("Unable to get partitions for topic: " + topic);
+        }
+
+        return topicPartitions.get(0).replicas().size();
     }
 
     /**
@@ -657,26 +700,8 @@ public class KafkaAdminClient implements Closeable {
         if (StringUtils.isBlank(topic))
             throw new IllegalArgumentException("topic cannot be null, empty or blank");
 
-        LOG.debug("Fetching topic partitions for topic [{}]", topic);
-
-        Map<String, Seq<Object>> javaMap;
-        try {
-            javaMap = convertToJavaMap(getZkUtils().getPartitionsForTopics(new Set1<>(topic).toSeq()).iterator());
-        } catch (ZkException | ZooKeeperClientException | KafkaException e) {
-            throw new AdminOperationException("Unable to retrieve number of partitions for topic: " + topic, e);
-        }
-
-        Seq<Object> partitions = javaMap.get(topic);
-        if (partitions == null ) {
-            throw new AdminOperationException("Failed to find any partitions for topic: " + topic);
-        }
-
-        Set<Object> partitionList = convertToJavaSet(partitions.iterator());
-        if (partitionList.isEmpty()) {
-            throw new AdminOperationException("Partition count is 0 for topic: " + topic);
-        }
-
-        return partitionList.size();
+        LOG.debug("Fetching topic partition count for topic [{}]", topic);
+        return getPartitions(Collections.singleton(topic)).size();
     }
 
     /**
@@ -701,9 +726,14 @@ public class KafkaAdminClient implements Closeable {
         LOG.debug("Adding topic partitions for topic [{}] with partitions [{}]", topic, partitions);
 
         try {
-            getNewAdminClient().createPartitions(Collections.singletonMap(topic, NewPartitions.increaseTo(partitions)));
-        } catch (ZkException | ZooKeeperClientException e) {
-            throw new AdminOperationException("Unable to add partitions to topic: " + topic, e);
+            getNewAdminClient().createPartitions(Collections.singletonMap(topic, NewPartitions.increaseTo(partitions)))
+                .all().get(operationTimeout, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException | ExecutionException | TimeoutException e) {
+            Throwable throwable = e.getCause();
+            // This will be thrown if the topic already has the specified number of partitions, ignore
+            if (!(throwable instanceof InvalidPartitionsException)) {
+                throw new AdminOperationException("Unable to add partitions to topic: " + topic, e);
+            }
         }
 
         long start = System.currentTimeMillis();
