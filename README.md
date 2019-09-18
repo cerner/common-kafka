@@ -55,7 +55,7 @@ The 2.0 release of common-kafka uses the following dependency versions.
 * [Kafka](http://kafka.apache.org/): 2.2.1
 * [Metrics](http://metrics.dropwizard.io/): 2.2.0
 * [Scala](https://scala-lang.org/): 2.12.8
-* [ZooKeeper](https://zookeeper.apache.org/): 3.4.9
+* [ZooKeeper](https://zookeeper.apache.org/): 3.4.14
 
 Note that the Scala and ZooKeeper dependencies are only applicable for common-kafka-admin and
 common-kafka-test.
