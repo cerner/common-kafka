@@ -236,11 +236,6 @@ public class KafkaAdminClientTest {
         client.createTopic("I'm not a valid topic!", 1, 1);
     }
 
-    @Test(expected = AdminOperationException.class)
-    public void createTopic_zkException() {
-        failureClient.createTopic(topic, 1, 1);
-    }
-
     @Test
     public void getTopics() {
         client.createTopic(topic, 1, 1);
@@ -251,18 +246,6 @@ public class KafkaAdminClientTest {
     public void getTopics_immutable() {
         client.createTopic(topic, 1, 1);
         client.getTopics().clear();
-    }
-
-    @Test(expected = AdminOperationException.class)
-    public void getTopics_zkException() {
-        failureClient.getTopics();
-    }
-
-    @Test(expected = AdminOperationException.class)
-    public void getTopics_zkConnectException() {
-        Properties props = new Properties();
-        props.setProperty(ZKConfig.ZkConnectProp(), "some_invalid_host:7777");
-        new KafkaAdminClient(props).getTopics();
     }
 
     @Test
@@ -520,11 +503,6 @@ public class KafkaAdminClientTest {
         client.deleteTopic("does_not_exist");
     }
 
-    @Test(expected = AdminOperationException.class)
-    public void deleteTopic_zkException() {
-        failureClient.deleteTopic(topic);
-    }
-
     @Test (expected = IllegalArgumentException.class)
     public void deleteTopic_nullTopic() {
         client.deleteTopic(null);
@@ -553,11 +531,6 @@ public class KafkaAdminClientTest {
     @Test (expected = IllegalArgumentException.class)
     public void getTopicConfig_emptyTopic() {
         client.getTopicConfig("");
-    }
-
-    @Test(expected = AdminOperationException.class)
-    public void getTopicConfig_zkException() {
-        failureClient.getTopicConfig(topic);
     }
 
     @Test
@@ -591,11 +564,6 @@ public class KafkaAdminClientTest {
         client.updateTopicConfig(topic, null);
     }
 
-    @Test(expected = AdminOperationException.class)
-    public void updateTopicConfig_zkException() {
-        failureClient.updateTopicConfig(topic, new Properties());
-    }
-
     @Test
     public void getTopicPartitions() {
         client.createTopic(topic, 1, 1);
@@ -610,11 +578,6 @@ public class KafkaAdminClientTest {
     @Test (expected = IllegalArgumentException.class)
     public void getTopicPartitions_emptyTopic() {
         client.getTopicPartitions("");
-    }
-
-    @Test (expected = AdminOperationException.class)
-    public void getTopicPartitions_zkException() {
-        failureClient.getTopicPartitions(topic);
     }
 
     @Test
@@ -652,11 +615,6 @@ public class KafkaAdminClientTest {
         client.addTopicPartitions(topic, 1);
     }
 
-    @Test (expected = AdminOperationException.class)
-    public void addTopicPartitions_zkException() {
-        failureClient.addTopicPartitions(topic, 5);
-    }
-
     @Test (expected = IllegalArgumentException.class)
     public void getTopicReplicationFactor_nullTopic() {
         client.getTopicReplicationFactor(null);
@@ -676,11 +634,6 @@ public class KafkaAdminClientTest {
     public void getTopicReplicationFactor() {
         client.createTopic(topic, 1, 1);
         assertThat(client.getTopicReplicationFactor(topic), is(1));
-    }
-
-    @Test (expected = AdminOperationException.class)
-    public void getTopicReplicationFactor_zkException() {
-        failureClient.getTopicReplicationFactor(topic);
     }
 
     @Test (expected = IllegalArgumentException.class)
