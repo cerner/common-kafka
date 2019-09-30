@@ -220,13 +220,19 @@ public class KafkaProducerPool<K, V> implements Closeable {
             }
         }
 
-        // Return the next producer in the rotation.
-        return producers.get(producerRotation.getAndIncrement() % producers.size());
+        // Return the next producer in the rotation. Make sure we correctly handle max int overflow
+        // if invoked that many times in a long running process.
+        return producers.get(Math.abs(getProducerRotation()) % producers.size());
     }
 
     // Visible for testing
     Producer<K, V> createProducer(Properties properties) {
         return new KafkaProducer<>(properties);
+    }
+
+    // Visible for testing
+    int getProducerRotation() {
+        return producerRotation.getAndIncrement();
     }
 
     /**

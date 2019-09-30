@@ -58,6 +58,8 @@ public class KafkaProducerPoolTest {
     private KafkaProducerPool<String, String> pool;
     private static KafkaAdminClient kafkaAdminClient;
 
+    private static final String FORCE_PRODUCER_ROTATION_OVERFLOW = "producer.rotation.overflow";
+
     @BeforeClass
     public static void startup() throws Exception {
         KafkaTests.startTest();
@@ -230,6 +232,16 @@ public class KafkaProducerPoolTest {
         messageProduction(props);
     }
 
+    @Test
+    public void producerRotationOverflow() throws IOException {
+        KafkaProducerPool<Object, Object> mockPool = new MockProducerPool();
+        Properties props = KafkaTests.getProps();
+        props.setProperty(FORCE_PRODUCER_ROTATION_OVERFLOW, String.valueOf(true));
+
+        mockPool.getProducer(props);
+        mockPool.close();
+    }
+
     private void messageProduction(Properties config) throws InterruptedException, KafkaExecutionException, ExecutionException {
         String topic = "topic_" + UUID.randomUUID().toString();
 
@@ -317,6 +329,15 @@ public class KafkaProducerPoolTest {
         Producer<Object, Object> createProducer(Properties properties) {
             producerProperties = properties;
             return mock(Producer.class);
+        }
+
+        @Override
+        public int getProducerRotation() {
+            if (producerProperties.getProperty(FORCE_PRODUCER_ROTATION_OVERFLOW) != null) {
+                return Integer.MAX_VALUE + 2;
+            } else {
+                return super.getProducerRotation();
+            }
         }
 
         public Properties getProducerProperties() {
