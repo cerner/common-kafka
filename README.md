@@ -1,4 +1,5 @@
-# Common Kafka
+# Common Kafka [![Build Status](https://travis-ci.com/cerner/common-kafka.svg?branch=master)](https://travis-ci.com/cerner/common-kafka)
+
 
 This repository contains common Kafka code supporting Cerner's cloud-based solutions.
 
