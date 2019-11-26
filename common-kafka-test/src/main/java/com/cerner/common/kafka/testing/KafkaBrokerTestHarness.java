@@ -32,7 +32,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static scala.collection.JavaConversions.asJavaIterable;
@@ -340,36 +339,10 @@ public class KafkaBrokerTestHarness extends ZookeeperTestHarness {
     }
 
     private static KafkaServer startBroker(KafkaConfig config) {
-        KafkaServer server = new KafkaServer(config, new SystemTime(), Option.empty(),
+        KafkaServer server = new KafkaServer(config, Time.SYSTEM, Option.empty(),
                 new scala.collection.mutable.MutableList<>());
         server.startup();
         return server;
-    }
-
-    private static class SystemTime implements Time {
-        @Override
-        public long milliseconds() {
-            return System.currentTimeMillis();
-        }
-
-        @Override
-        public long nanoseconds() {
-            return System.nanoTime();
-        }
-
-        @Override
-        public void sleep(long ms) {
-            try {
-                Thread.sleep(ms);
-            } catch (InterruptedException e) {
-                // Ignore
-            }
-        }
-
-        @Override
-        public long hiResClockMs() {
-            return TimeUnit.NANOSECONDS.toMillis(milliseconds());
-        }
     }
 }
 
