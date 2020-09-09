@@ -147,7 +147,7 @@ public class ConsumerOffsetClient implements Closeable {
         Map<TopicPartition, Long> offsets = new HashMap<>();
         offsets.putAll(foundOffsets.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().offset())));
 
-        //if some partitions do not have offsets at the specified time, find the earliest partitions for that time.
+        //if some partitions do not have offsets at the specified time, find the latest offsets of the partitions for that time.
         List<TopicPartition> missingPartitions = partitions.stream()
                 .filter(t -> !foundOffsets.containsKey(t)).collect(Collectors.toList());
         if(!missingPartitions.isEmpty()) {
