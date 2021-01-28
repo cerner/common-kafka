@@ -243,10 +243,16 @@ public class ConsumerOffsetClientTest {
 
         when(consumer.offsetsForTimes(anyObject())).thenReturn(offsets);
 
+        Map<TopicPartition, Long> missingOffsets = new HashMap<>();
+        missingOffsets.put(new TopicPartition("topic1", 0), 234L);
+
+        when(consumer.endOffsets(anyObject())).thenReturn(missingOffsets);
+
         Map<TopicPartition, Long> longOffsets = new HashMap<>();
+        longOffsets.put(new TopicPartition("topic1", 0), 234L);
         longOffsets.put(new TopicPartition("topic1", 1), 234L);
 
-        long time = 1L;
+        long time = 10L;
         assertThat(client.getOffsetsForTimes(Collections.singletonList("topic1"), time), is(longOffsets));
 
         verify(consumer).offsetsForTimes(offsetsRequests.capture());
