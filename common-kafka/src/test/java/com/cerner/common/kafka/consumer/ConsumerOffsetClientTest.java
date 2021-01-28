@@ -231,6 +231,41 @@ public class ConsumerOffsetClientTest {
     }
 
     @Test
+    public void getOffsetsForTimesNullOffsets() {
+        Map<TopicPartition, OffsetAndTimestamp> offsets = new HashMap<>();
+        offsets.put(new TopicPartition("topic1", 0), null);
+        offsets.put(new TopicPartition("topic1", 1), new OffsetAndTimestamp(234L, 10));
+
+
+        when(consumer.partitionsFor("topic1")).thenReturn(Arrays.asList(
+                new PartitionInfo("topic1", 0, null, null, null),
+                new PartitionInfo("topic1", 1, null, null, null)));
+
+        when(consumer.offsetsForTimes(anyObject())).thenReturn(offsets);
+
+        Map<TopicPartition, Long> longOffsets = new HashMap<>();
+        longOffsets.put(new TopicPartition("topic1", 1), 234L);
+
+        long time = 1L;
+        assertThat(client.getOffsetsForTimes(Collections.singletonList("topic1"), time), is(longOffsets));
+
+        verify(consumer).offsetsForTimes(offsetsRequests.capture());
+
+        Map<TopicPartition, Long> requestValue = offsetsRequests.getValue();
+        Set<TopicPartition> topicPartitions = requestValue.keySet();
+
+        assertThat(topicPartitions, hasItem(new TopicPartition("topic1", 1)));
+
+        requestValue.values().forEach(i -> assertThat(i, is(time)));
+
+        verify(consumer).endOffsets(endOffsetRequest.capture());
+
+        Collection<TopicPartition> endingValue = endOffsetRequest.getValue();
+        assertThat(endingValue.size(), is(1));
+        assertThat(endingValue, hasItem(new TopicPartition("topic1", 0)));
+    }
+
+    @Test
     public void getOffsetsForTimesSomeMissing() {
         Map<TopicPartition, OffsetAndTimestamp> offsets = new HashMap<>();
 
