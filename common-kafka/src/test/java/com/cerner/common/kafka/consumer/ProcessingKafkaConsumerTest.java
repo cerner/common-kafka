@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.apache.kafka.clients.consumer.Consumer;
@@ -912,10 +913,17 @@ public class ProcessingKafkaConsumerTest {
     }
 
     @Test
-    public void subscribe() {
+    public void subscribe_topicList() {
         List<String> topics = Arrays.asList("topic1", "topic2");
         processingConsumer.subscribe(topics);
         verify(consumer).subscribe(topics, processingConsumer.rebalanceListener);
+    }
+
+    @Test
+    public void subscribe_regexPattern() {
+        Pattern pattern = Pattern.compile("^some-prefix\\..*");
+        processingConsumer.subscribe(pattern);
+        verify(consumer).subscribe(pattern, processingConsumer.rebalanceListener);
     }
 
     @Test

@@ -31,6 +31,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -669,8 +670,8 @@ public class ProcessingKafkaConsumer<K, V> implements Closeable {
 
     /**
      * <p>
-     * Subscribes the consumer to the collection of topics. This call is not additive and will replace the existing
-     * subscriptions.
+     * Subscribes the consumer to the collection of topics. This call is not additive and will replace any existing
+     * subscription.
      * </p>
      *
      * <p>
@@ -683,6 +684,24 @@ public class ProcessingKafkaConsumer<K, V> implements Closeable {
     public void subscribe(Collection<String> topics) {
         // This method does not throw a KafkaException
         consumer.subscribe(topics, rebalanceListener);
+    }
+
+    /**
+     * <p>
+     * Subscribes the consumer to the provided topic name regular expression pattern. This call is not additive and will replace
+     * any existing subscription.
+     * </p>
+     *
+     * <p>
+     * NOTE: This should be called prior to calling {@link #nextRecord(long)} in order to set the appropriate topics to read
+     * from.
+     * </p>
+     *
+     * @param pattern the topic name regular expression pattern to subscribe to
+     */
+    public void subscribe(Pattern pattern) {
+        // This method does not throw a KafkaException
+        consumer.subscribe(pattern, rebalanceListener);
     }
 
     /**
