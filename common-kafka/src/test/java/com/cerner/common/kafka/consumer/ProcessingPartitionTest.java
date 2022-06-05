@@ -2,6 +2,7 @@ package com.cerner.common.kafka.consumer;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasItem;
@@ -158,19 +159,19 @@ public class ProcessingPartitionTest {
         assertThat(partition.hasNextRecord(), is(true));
         assertRecordsAreEqual(partition.nextRecord(), record(2L));
 
-        assertThat(partition.pendingOffsets.keySet(), contains(1L, 2L));
+        assertThat(partition.pendingOffsets.keySet(), containsInAnyOrder(1L, 2L));
         assertThat(partition.offsetPosition, is(3L));
 
         assertThat(partition.hasNextRecord(), is(true));
         assertRecordsAreEqual(partition.nextRecord(), record(3L));
 
-        assertThat(partition.pendingOffsets.keySet(), contains(1L, 2L, 3L));
+        assertThat(partition.pendingOffsets.keySet(), containsInAnyOrder(1L, 2L, 3L));
         assertThat(partition.offsetPosition, is(4L));
 
         assertThat(partition.hasNextRecord(), is(false));
         assertThat(partition.nextRecord(), is(nullValue()));
 
-        assertThat(partition.pendingOffsets.keySet(), contains(1L, 2L, 3L));
+        assertThat(partition.pendingOffsets.keySet(), containsInAnyOrder(1L, 2L, 3L));
         assertThat(partition.offsetPosition, is(4L));
 
         assertThat(partition.committableOffset, is(nullValue()));
@@ -220,7 +221,7 @@ public class ProcessingPartitionTest {
 
         // Read second record
         assertRecordsAreEqual(partition.nextRecord(), record(2L));
-        assertThat(partition.pendingOffsets.keySet(), contains(1L, 2L));
+        assertThat(partition.pendingOffsets.keySet(), containsInAnyOrder(1L, 2L));
         assertThat(partition.offsetPosition, is(3L));
 
         // Fail record first record
@@ -258,13 +259,13 @@ public class ProcessingPartitionTest {
 
         assertThat(partition.hasNextRecord(), is(false));
         assertThat(partition.offsetPosition, is(3L));
-        assertThat(partition.pendingOffsets.keySet(), contains(0L, 1L, 2L));
+        assertThat(partition.pendingOffsets.keySet(), containsInAnyOrder(0L, 1L, 2L));
         assertThat(partition.completedOffsets, empty());
 
         // Ack an early record
         assertThat(partition.ack(0L), is(true));
 
-        assertThat(partition.pendingOffsets.keySet(), contains(1L, 2L));
+        assertThat(partition.pendingOffsets.keySet(), containsInAnyOrder(1L, 2L));
         assertThat(partition.completedOffsets, contains(0L));
 
         assertThat(partition.committableOffset, is(1L));
@@ -292,7 +293,7 @@ public class ProcessingPartitionTest {
 
         assertThat(partition.hasNextRecord(), is(false));
         assertThat(partition.offsetPosition, is(3L));
-        assertThat(partition.pendingOffsets.keySet(), contains(1L, 2L));
+        assertThat(partition.pendingOffsets.keySet(), containsInAnyOrder(1L, 2L));
         assertThat(partition.completedOffsets, contains(0L));
 
         assertThat(partition.committableOffset, is(1L));
