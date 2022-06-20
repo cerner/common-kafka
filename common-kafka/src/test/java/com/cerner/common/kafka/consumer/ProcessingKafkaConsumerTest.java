@@ -267,6 +267,7 @@ public class ProcessingKafkaConsumerTest {
         when(consumer.poll(any(Duration.class))).thenReturn(records);
 
         rebuildConsumer();
+        processingConsumer.rebalanceListener.onPartitionsRevoked(topicPartitions);
         processingConsumer.rebalanceListener.onPartitionsAssigned(topicPartitions);
 
         // We are asserting that we will read message 0 for each partition before reading 1 and then 2
@@ -1203,6 +1204,7 @@ public class ProcessingKafkaConsumerTest {
                 new TopicPartition(record6.topic(), record6.partition()));
 
         // Assign topics to consumer
+        processingConsumer.rebalanceListener.onPartitionsRevoked(assignedPartitions);
         processingConsumer.rebalanceListener.onPartitionsAssigned(assignedPartitions);
     }
 
