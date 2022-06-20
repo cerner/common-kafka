@@ -761,7 +761,7 @@ public class ProcessingKafkaConsumer<K, V> implements Closeable {
              * because we may have been disconnected and missed an entire group generation
              * during which another consumer might have been assigned the partition and committed offsets.
              */
-            partitions.values().stream()
+            partitions.values()
                     .forEach(partition -> IOUtils.closeQuietly(partition));
 
             partitions.clear();
