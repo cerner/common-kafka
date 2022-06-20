@@ -46,6 +46,8 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 
@@ -57,6 +59,8 @@ public class ProcessingKafkaConsumerTest {
 
     @Mock
     Consumer<String, String> consumer;
+    @Captor
+    ArgumentCaptor<Map<TopicPartition, OffsetAndMetadata>> commitCaptor;
 
     ProcessingKafkaConsumer<String, String> processingConsumer;
 
@@ -381,6 +385,9 @@ public class ProcessingKafkaConsumerTest {
 
     @Test
     public void fail() {
+        // seek is invoked by setup of this test class
+        verify(processingConsumer.consumer).seek(topicPartition, offset);
+
         long previousFailCount = ProcessingKafkaConsumer.FAIL_METER.count();
 
         // Read a bunch of messages
@@ -413,7 +420,7 @@ public class ProcessingKafkaConsumerTest {
                 is(nullValue()));
 
         // Failing record 2 should rewind our consumer for that partition to the last committed offset
-        verify(processingConsumer.consumer).seek(topicPartition, offset);
+        verify(processingConsumer.consumer, times(2)).seek(topicPartition, offset);
 
         // We never committed anything
         verify(consumer, never()).commitSync(anyMap());
@@ -421,19 +428,24 @@ public class ProcessingKafkaConsumerTest {
 
     @Test
     public void fail_topicPartitionIsNotPending() {
+        // seek is invoked by setup of this test class
+        verify(consumer, times(4)).seek(any(TopicPartition.class), anyLong());
+
         assertThat(processingConsumer.fail(topicPartition, offset), is(false));
 
         // Verify we never reset our consumer
-        verify(consumer, never()).seek(topicPartition, offset);
+        verify(consumer, times(4)).seek(any(TopicPartition.class), anyLong());
     }
 
     @Test
     public void fail_offsetIsNotPending() {
+        // seek is invoked by setup of this test class
+        verify(consumer).seek(topicPartition, offset);
         processingConsumer.nextRecord(POLL_TIME);
         assertThat(processingConsumer.fail(topicPartition, offset + 1), is(false));
 
         // Verify we never reset our consumer
-        verify(consumer, never()).seek(topicPartition, offset);
+        verify(consumer).seek(topicPartition, offset);
     }
 
     @Test
@@ -474,6 +486,9 @@ public class ProcessingKafkaConsumerTest {
 
     @Test
     public void resetOffsets_noAssignment() {
+        // seek is invoked by setup of this test class
+        verify(consumer, times(4)).seek(any(TopicPartition.class), anyLong());
+
         TopicPartition a0 = new TopicPartition("a", 0);
         TopicPartition a1 = new TopicPartition("a", 1);
         TopicPartition b0 = new TopicPartition("b", 0);
@@ -488,11 +503,14 @@ public class ProcessingKafkaConsumerTest {
         processingConsumer.resetOffsets(offsets);
 
         verify(consumer, never()).commitSync(anyMap());
-        verify(consumer, never()).seek(any(TopicPartition.class), anyLong());
+        verify(consumer, times(4)).seek(any(TopicPartition.class), anyLong());
     }
 
     @Test
     public void resetOffsets_noOffsets() {
+        // seek is invoked by setup of this test class
+        verify(consumer, times(4)).seek(any(TopicPartition.class), anyLong());
+
         TopicPartition a0 = new TopicPartition("a", 0);
         TopicPartition a1 = new TopicPartition("a", 1);
         TopicPartition b0 = new TopicPartition("b", 0);
@@ -504,7 +522,7 @@ public class ProcessingKafkaConsumerTest {
         processingConsumer.resetOffsets(Collections.emptyMap());
 
         verify(consumer, never()).commitSync(anyMap());
-        verify(consumer, never()).seek(any(TopicPartition.class), anyLong());
+        verify(consumer, times(4)).seek(any(TopicPartition.class), anyLong());
     }
 
     @Test
@@ -553,6 +571,9 @@ public class ProcessingKafkaConsumerTest {
 
     @Test
     public void resetOffsets_notAssigned() {
+        // seek is invoked by setup of this test class
+        verify(consumer, times(4)).seek(any(TopicPartition.class), anyLong());
+
         TopicPartition a0 = new TopicPartition("a", 0);
         TopicPartition a1 = new TopicPartition("a", 1);
         TopicPartition b0 = new TopicPartition("b", 0);
@@ -567,7 +588,7 @@ public class ProcessingKafkaConsumerTest {
         processingConsumer.resetOffsets(offsets);
 
         verify(consumer, never()).commitSync(anyMap());
-        verify(consumer, never()).seek(any(TopicPartition.class), anyLong());
+        verify(consumer, times(4)).seek(any(TopicPartition.class), anyLong());
     }
 
     @Test
@@ -717,6 +738,20 @@ public class ProcessingKafkaConsumerTest {
         //Should have two eligible offsets before rebalance
         assertThat(processingConsumer.getCommittableOffsets().size(), is(2));
 
+        //Will always be called before onPartitionsAssigned
+        processingConsumer.rebalanceListener.onPartitionsRevoked(Arrays.asList(topicPartition,
+                new TopicPartition(record4.topic(), record4.partition()),
+                new TopicPartition(record5.topic(), record5.partition()),
+                new TopicPartition(record6.topic(), record6.partition())
+        ));
+
+        // Both record1 and record4 should have been committed
+        verify(consumer).commitSync(commitCaptor.capture());
+        Map<TopicPartition, OffsetAndMetadata> committedOffsets = commitCaptor.getValue();
+        assertThat(committedOffsets.size(), is(2));
+        assertThat(committedOffsets.get(new TopicPartition(record1.topic(), record1.partition())), is(new OffsetAndMetadata(record1.offset() + 1)));
+        assertThat(committedOffsets.get(new TopicPartition(record4.topic(), record4.partition())), is(new OffsetAndMetadata(record4.offset() + 1)));
+
         // Change our assignments so we no longer are interested in record 1's partition
         processingConsumer.rebalanceListener.onPartitionsAssigned(Arrays.asList(
                 new TopicPartition(record4.topic(), record4.partition()),
@@ -726,14 +761,6 @@ public class ProcessingKafkaConsumerTest {
 
         assertThat(processingConsumer.getCommittableOffsets().isEmpty(), is(true));
 
-        //Attempt to commit offsets, but no-op since rebalance invalidates cached state.
-        processingConsumer.commitOffsets();
-
-        // No records should have been committed
-        verify(consumer, times(0)).commitSync(Collections.singletonMap(
-                new TopicPartition(record4.topic(), record4.partition()), new OffsetAndMetadata(record4.offset() + 1)));
-
-        assertThat(processingConsumer.getCommittableOffsets().isEmpty(), is(true));
     }
 
     @Test
@@ -755,21 +782,26 @@ public class ProcessingKafkaConsumerTest {
         //Should have two eligible offsets before rebalance
         assertThat(processingConsumer.getCommittableOffsets().size(), is(2));
 
+        //Will always be called before onPartitionsAssigned
+        processingConsumer.rebalanceListener.onPartitionsRevoked(Arrays.asList(topicPartition,
+                new TopicPartition(record4.topic(), record4.partition()),
+                new TopicPartition(record5.topic(), record5.partition()),
+                new TopicPartition(record6.topic(), record6.partition())
+        ));
+
+        // Both record1 and record4 should have been committed
+        verify(consumer).commitSync(commitCaptor.capture());
+        Map<TopicPartition, OffsetAndMetadata> committedOffsets = commitCaptor.getValue();
+        assertThat(committedOffsets.size(), is(2));
+        assertThat(committedOffsets.get(new TopicPartition(record1.topic(), record1.partition())), is(new OffsetAndMetadata(record1.offset() + 1)));
+        assertThat(committedOffsets.get(new TopicPartition(record4.topic(), record4.partition())), is(new OffsetAndMetadata(record4.offset() + 1)));
+
         // Rebalance invoked, but no change in our assignments
         processingConsumer.rebalanceListener.onPartitionsAssigned(Arrays.asList(topicPartition,
                 new TopicPartition(record4.topic(), record4.partition()),
                 new TopicPartition(record5.topic(), record5.partition()),
                 new TopicPartition(record6.topic(), record6.partition())
         ));
-
-        assertThat(processingConsumer.getCommittableOffsets().isEmpty(), is(true));
-
-        //Attempt to commit offsets, but no-op since rebalance invalidates cached state.
-        processingConsumer.commitOffsets();
-
-        // No records should have been committed
-        verify(consumer, times(0)).commitSync(Collections.singletonMap(
-                new TopicPartition(record4.topic(), record4.partition()), new OffsetAndMetadata(record4.offset() + 1)));
 
         assertThat(processingConsumer.getCommittableOffsets().isEmpty(), is(true));
     }

@@ -10,8 +10,11 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.core.Is.is;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyMap;
+import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -180,8 +183,9 @@ public class ProcessingPartitionTest {
 
     @Test
     public void fail_notPending() {
+        verify(consumer, times(1)).seek(topicPartition, 0);
         assertThat(partition.fail(1L), is(false));
-        verify(consumer, never()).seek(topicPartition, 0);
+        verify(consumer, times(1)).seek(topicPartition, 0);
         verify(consumer, never()).pause(Collections.singleton(topicPartition));
     }
 
@@ -202,7 +206,7 @@ public class ProcessingPartitionTest {
         assertThat(partition.completedOffsets, empty());
 
         // Our consumer had a commit for this partition so it should have used to re-wind
-        verify(consumer).seek(topicPartition, 0L);
+        verify(consumer, atLeastOnce()).seek(topicPartition, 0L);
 
         // We have not had enough failures to cause us to pause
         verify(consumer, never()).pause(Collections.singleton(topicPartition));
@@ -210,6 +214,9 @@ public class ProcessingPartitionTest {
 
     @Test
     public void fail_offsetPositionBeforeFailedRecord() {
+
+        //The setup of this unit test class invokes the seek method on consumer
+        verify(consumer, times(1)).seek(topicPartition, 0L);
 
         // Add record to partition to be processed, give it a high offset
         partition.load(Arrays.asList(record(1L), record(2L)));
@@ -232,7 +239,7 @@ public class ProcessingPartitionTest {
         assertThat(partition.completedOffsets, empty());
 
         // Our consumer had a commit for this partition so it should have used to re-wind
-        verify(consumer).seek(topicPartition, 0L);
+        verify(consumer, times(2)).seek(topicPartition, 0L);
         assertThat(partition.offsetPosition, is(0L));
 
         // Fail record second record
@@ -244,7 +251,7 @@ public class ProcessingPartitionTest {
 
         // Consumer should have only done 1 seek since it did a rewind to a previous offset so we are set to re-process
         // the second record too and don't need to rewind again
-        verify(consumer).seek(topicPartition, 0L);
+        verify(consumer, times(2)).seek(topicPartition, 0L);
         assertThat(partition.offsetPosition, is(0L));
     }
 
@@ -282,7 +289,7 @@ public class ProcessingPartitionTest {
         assertThat(partition.lastCommittedOffset, is(0L));
         assertThat(partition.getCommittableOffsetsSize(), is(1L));
 
-        verify(consumer).seek(topicPartition, 0L);
+        verify(consumer, atLeastOnce()).seek(topicPartition, 0L);
         assertThat(partition.offsetPosition, is(0L));
 
         // Since we seeked to the beginning assume we re-read those same messages starting from 0
@@ -383,7 +390,7 @@ public class ProcessingPartitionTest {
         verify(consumer, never()).pause(Collections.singleton(topicPartition));
 
         assertThat(partition.fail(0L), is(true));
-        verify(consumer).seek(topicPartition, 0L);
+        verify(consumer, atLeastOnce()).seek(topicPartition, 0L);
 
         // Although we failed we haven't hit our threshold yet (>= 50% of 3)
         assertThat(partition.paused, is(false));
