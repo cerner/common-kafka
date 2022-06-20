@@ -179,7 +179,7 @@ public class ProcessingKafkaConsumerITest {
 
             if (System.currentTimeMillis() >= nextHistoryCheck) {
                 // Verify the history is as we expect (excluding terminal conditions)
-                verifyHistory(recordHistory, false, shutdownConsumers);
+                verifyHistory(recordHistory, false);
 
                 for(Map.Entry<RecordId, List<ConsumerAction>> entry : recordHistory.entrySet()) {
                     LOGGER.debug("Record history: {} - {}", entry.getKey(), entry.getValue());
@@ -206,7 +206,7 @@ public class ProcessingKafkaConsumerITest {
         }
 
         // Verify the history is as we expect (including terminal conditions)
-        verifyHistory(recordHistory, true, shutdownConsumers);
+        verifyHistory(recordHistory, true);
 
         // Cleanup threads, if there are any problems just log a warning since the test was otherwise successful
         for(ConsumerThread thread : threads) {
@@ -243,7 +243,7 @@ public class ProcessingKafkaConsumerITest {
         return false;
     }
 
-    private void verifyHistory(Map<RecordId, List<ConsumerAction>> recordHistory, boolean end, boolean shutdownConsumers) {
+    private void verifyHistory(Map<RecordId, List<ConsumerAction>> recordHistory, boolean end) {
         for(Map.Entry<RecordId, List<ConsumerAction>> recordHist : recordHistory.entrySet()) {
             int read = 0;
             int acked = 0;
@@ -279,13 +279,6 @@ public class ProcessingKafkaConsumerITest {
                     ++committed;
                     break;
                 }
-            }
-
-            // Each unique consumer should only ack a given record once. Skip this verification if consumers are being shutdown
-            // since the assignment can potential change back to a previous consumer.
-            if (!shutdownConsumers) {
-                assertThat("Record " + recordHist.getKey() + " was acked more than once by a consumer. History = " + actionHistory,
-                        acked, is(ackedBy.size()));
             }
 
             // Each record should be read prior to ack or fail
