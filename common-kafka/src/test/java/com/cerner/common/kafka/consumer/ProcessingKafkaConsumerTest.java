@@ -714,6 +714,9 @@ public class ProcessingKafkaConsumerTest {
         processingConsumer.ack(topicPartition, record1.offset());
         processingConsumer.ack(new TopicPartition(record4.topic(), record4.partition()), record4.offset());
 
+        //Should have two eligible offsets before rebalance
+        assertThat(processingConsumer.getCommittableOffsets().size(), is(2));
+
         // Change our assignments so we no longer are interested in record 1's partition
         processingConsumer.rebalanceListener.onPartitionsAssigned(Arrays.asList(
                 new TopicPartition(record4.topic(), record4.partition()),
@@ -721,10 +724,51 @@ public class ProcessingKafkaConsumerTest {
                 new TopicPartition(record6.topic(), record6.partition())
         ));
 
+        assertThat(processingConsumer.getCommittableOffsets().isEmpty(), is(true));
+
+        //Attempt to commit offsets, but no-op since rebalance invalidates cached state.
         processingConsumer.commitOffsets();
 
-        // Only record 4 should have been committed
-        verify(consumer).commitSync(Collections.singletonMap(
+        // No records should have been committed
+        verify(consumer, times(0)).commitSync(Collections.singletonMap(
+                new TopicPartition(record4.topic(), record4.partition()), new OffsetAndMetadata(record4.offset() + 1)));
+
+        assertThat(processingConsumer.getCommittableOffsets().isEmpty(), is(true));
+    }
+
+    @Test
+    public void commitOffsets_noChangeToAssignment() {
+        // Read a bunch of messages
+        processingConsumer.nextRecord(POLL_TIME); // record 1
+        processingConsumer.nextRecord(POLL_TIME); // null
+        processingConsumer.nextRecord(POLL_TIME); // record 2
+        processingConsumer.nextRecord(POLL_TIME); // record 3
+        processingConsumer.nextRecord(POLL_TIME); // null
+        processingConsumer.nextRecord(POLL_TIME); // record 4
+        processingConsumer.nextRecord(POLL_TIME); // record 5
+        processingConsumer.nextRecord(POLL_TIME); // record 6
+
+        // Ack record 1 and 4
+        processingConsumer.ack(topicPartition, record1.offset());
+        processingConsumer.ack(new TopicPartition(record4.topic(), record4.partition()), record4.offset());
+
+        //Should have two eligible offsets before rebalance
+        assertThat(processingConsumer.getCommittableOffsets().size(), is(2));
+
+        // Rebalance invoked, but no change in our assignments
+        processingConsumer.rebalanceListener.onPartitionsAssigned(Arrays.asList(topicPartition,
+                new TopicPartition(record4.topic(), record4.partition()),
+                new TopicPartition(record5.topic(), record5.partition()),
+                new TopicPartition(record6.topic(), record6.partition())
+        ));
+
+        assertThat(processingConsumer.getCommittableOffsets().isEmpty(), is(true));
+
+        //Attempt to commit offsets, but no-op since rebalance invalidates cached state.
+        processingConsumer.commitOffsets();
+
+        // No records should have been committed
+        verify(consumer, times(0)).commitSync(Collections.singletonMap(
                 new TopicPartition(record4.topic(), record4.partition()), new OffsetAndMetadata(record4.offset() + 1)));
 
         assertThat(processingConsumer.getCommittableOffsets().isEmpty(), is(true));
