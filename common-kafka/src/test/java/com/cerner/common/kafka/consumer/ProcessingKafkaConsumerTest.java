@@ -811,8 +811,8 @@ public class ProcessingKafkaConsumerTest {
     @Test
     public void commitOffsets_missedCommitsBetweenRebalanceGenerations() {
 
-        // Read a bunch of messages
-        processingConsumer.nextRecord(POLL_TIME); // record 1
+        // Read record 1
+        processingConsumer.nextRecord(POLL_TIME);
 
         // Ack record
         processingConsumer.ack(topicPartition, record1.offset());
