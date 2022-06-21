@@ -767,7 +767,7 @@ public class ProcessingKafkaConsumer<K, V> implements Closeable {
             partitions.clear();
 
             try {
-                partitionsAssigned.stream()
+                partitionsAssigned
                         .forEach(tp -> partitions.put(tp, buildPartition(tp, config, consumer)));
             } catch (IllegalStateException e) {
                 LOGGER.error("Failed to initialize processing partition", e);
