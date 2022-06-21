@@ -10,6 +10,7 @@ import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anyMap;
 import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -805,6 +806,62 @@ public class ProcessingKafkaConsumerTest {
         ));
 
         assertThat(processingConsumer.getCommittableOffsets().isEmpty(), is(true));
+    }
+
+    @Test
+    public void commitOffsets_missedCommitsBetweenRebalanceGenerations() {
+
+        // Read a bunch of messages
+        processingConsumer.nextRecord(POLL_TIME); // record 1
+
+        // Ack record
+        processingConsumer.ack(topicPartition, record1.offset());
+        //Should have one eligible offset before rebalance
+        assertThat(processingConsumer.getCommittableOffsets().size(), is(1));
+
+        //Will always be called before onPartitionsAssigned
+        processingConsumer.rebalanceListener.onPartitionsRevoked(Arrays.asList(topicPartition,
+                new TopicPartition(record4.topic(), record4.partition()),
+                new TopicPartition(record5.topic(), record5.partition()),
+                new TopicPartition(record6.topic(), record6.partition())
+        ));
+        // record1 should have been committed
+        verify(consumer).commitSync(commitCaptor.capture());
+        Map<TopicPartition, OffsetAndMetadata> committedOffsets = commitCaptor.getValue();
+        assertThat(committedOffsets.size(), is(1));
+        assertThat(committedOffsets.get(new TopicPartition(record1.topic(), record1.partition())), is(new OffsetAndMetadata(record1.offset() + 1)));
+
+        //Simulate missed generation before we rejoin consumer group
+        when(consumer.poll(any(Duration.class)))
+                .thenReturn(new ConsumerRecords<>(Collections.singletonMap(topicPartition, Arrays.asList(record3))));
+        when(consumer.committed(topicPartition)).thenReturn(new OffsetAndMetadata(record2.offset() + 1));
+
+        // Rejoin consumer group during subsequent rebalance
+        processingConsumer.rebalanceListener.onPartitionsAssigned(Arrays.asList(topicPartition,
+                new TopicPartition(record4.topic(), record4.partition()),
+                new TopicPartition(record5.topic(), record5.partition()),
+                new TopicPartition(record6.topic(), record6.partition())
+        ));
+        assertThat(processingConsumer.getCommittableOffsets().isEmpty(), is(true));
+
+        processingConsumer.nextRecord(POLL_TIME); // record 3
+
+        // Ack record 3
+        processingConsumer.ack(new TopicPartition(record3.topic(), record3.partition()), record3.offset());
+
+        // Record 3 offset should be committable, even though we never saw record 2
+        assertThat(processingConsumer.getCommittableOffsets().size(), is(1));
+
+        processingConsumer.commitOffsets();
+
+        // record3 should have been committed
+        verify(consumer, atLeastOnce()).commitSync(commitCaptor.capture());
+        committedOffsets = commitCaptor.getValue();
+        assertThat(committedOffsets.size(), is(1));
+        assertThat(committedOffsets.get(new TopicPartition(record3.topic(), record3.partition())), is(new OffsetAndMetadata(record3.offset() + 1)));
+
+        assertThat(processingConsumer.getCommittableOffsets().isEmpty(), is(true));
+
     }
 
     @Test
