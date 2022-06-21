@@ -249,8 +249,8 @@ public class ProcessingPartitionTest {
         assertThat(partition.pendingOffsets.keySet(), empty());
         assertThat(partition.completedOffsets, empty());
 
-        // Consumer should have only done 1 seek since it did a rewind to a previous offset so we are set to re-process
-        // the second record too and don't need to rewind again
+        // Consumer should have only done 1 more seek after the test setup, because it did a rewind to a previous
+        // offset so we are set to re-process the second record too and don't need to rewind again.
         verify(consumer, times(2)).seek(topicPartition, 0L);
         assertThat(partition.offsetPosition, is(0L));
     }
