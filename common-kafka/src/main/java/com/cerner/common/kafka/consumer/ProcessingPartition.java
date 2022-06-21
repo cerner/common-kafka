@@ -153,7 +153,7 @@ public class ProcessingPartition<K, V> implements Closeable {
 
         lastCommittedOffset = getLastCommittedOffset();
 
-        //Consumer fetch cursors might be ahead of last committed offset
+        // Consumer fetch cursors might be ahead of last committed offset
         resetToCommitted();
     }
 
