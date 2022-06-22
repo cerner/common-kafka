@@ -2,10 +2,9 @@ package com.cerner.common.kafka.consumer;
 
 import com.cerner.common.kafka.KafkaTests;
 import com.cerner.common.kafka.admin.KafkaAdminClient;
-import com.cerner.common.kafka.consumer.ProcessingConfig;
-
 import com.cerner.common.kafka.consumer.assignors.FairAssignor;
 import org.apache.commons.io.IOUtils;
+import org.apache.kafka.clients.consumer.CommitFailedException;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -29,6 +28,7 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -57,11 +57,12 @@ public class ProcessingKafkaConsumerITest {
     private static final long CONSUMER_SHUTDOWN_TIME_MAX = 30000; // 30s - max time we wait before shutting down our consumer
     private static final long CONSUMER_STARTUP_STAGGER_TIME_MAX = 2000; // 2s - max interval between consecutive consumer startup
     private static final long CONSUMER_POLL_TIMEOUT = 1000; // 1s
+    private static final long CONSUMER_POLL_INTERVAL_TIMEOUT = 1000; // 1s - max time between polls before rebalancing consumer group
     private static final long CONSUMER_THREAD_JOIN_TIMEOUT = 5000; // 5s - max time we wait for consumer thread to finish running
-    private static final int TOPICS = 3;
-    private static final int PARTITIONS = 3;
-    private static final int CONSUMERS = 3;
-    private static final int MESSAGES_PER_TOPIC = 25;
+    private static final int TOPICS = 4;
+    private static final int PARTITIONS = 8;
+    private static final int CONSUMERS = 5;
+    private static final int MESSAGES_PER_TOPIC = 50;
     private static final long HISTORY_CHECK_TIME = 15000; // 15s - how often to check/print processing history during testing
 
     private static Properties CONSUMER_PROPERTIES = new Properties();
@@ -79,7 +80,7 @@ public class ProcessingKafkaConsumerITest {
         CONSUMER_PROPERTIES.putAll(KafkaTests.getProps());
         CONSUMER_PROPERTIES.setProperty(ConsumerConfig.PARTITION_ASSIGNMENT_STRATEGY_CONFIG, FairAssignor.class.getName());
         CONSUMER_PROPERTIES.setProperty(ProcessingConfig.COMMIT_SIZE_THRESHOLD_PROPERTY, "5"); // >= 5 offsets in a partition
-        CONSUMER_PROPERTIES.setProperty(ProcessingConfig.COMMIT_TIME_THRESHOLD_PROPERTY, "10000"); // >= 10s since last commit
+        CONSUMER_PROPERTIES.setProperty(ProcessingConfig.COMMIT_TIME_THRESHOLD_PROPERTY, "5000"); // >= 5s since last commit
         CONSUMER_PROPERTIES.setProperty(ProcessingConfig.FAIL_PAUSE_TIME_PROPERTY, "2500"); // 2.5s
         CONSUMER_PROPERTIES.setProperty(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         CONSUMER_PROPERTIES.setProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
@@ -93,19 +94,63 @@ public class ProcessingKafkaConsumerITest {
         KafkaTests.endTest();
     }
 
-    @Test
-    public void processingWithProcessingFailuresAndConsumerShutdown() throws IOException, InterruptedException {
-        runProcessing(true); // shutdown consumers
+    public enum Condition {
+        FAILURES,
+        SHUTDOWN_CONSUMERS,
+        TIMEOUT_CONSUMERS
     }
 
     @Test
-    public void processingWithProcessingFailures() throws IOException, InterruptedException {
-        runProcessing(false); // don't shutdown consumers
+    public void processing() throws IOException, InterruptedException {
+        runProcessing();
+    }
+
+    @Test
+    public void processingWithFailures() throws IOException, InterruptedException {
+        runProcessing(Condition.FAILURES);
+    }
+
+    @Test
+    public void processingWithShutdown() throws IOException, InterruptedException {
+        runProcessing(Condition.SHUTDOWN_CONSUMERS);
+    }
+
+    @Test
+    public void processingWithTimeouts() throws IOException, InterruptedException {
+        runProcessing(Condition.TIMEOUT_CONSUMERS);
+    }
+
+    @Test
+    public void processingWithFailuresAndShutdown() throws IOException, InterruptedException {
+        runProcessing(Condition.FAILURES, Condition.SHUTDOWN_CONSUMERS);
+    }
+
+    @Test
+    public void processingWithFailuresAndTimeouts() throws IOException, InterruptedException {
+        runProcessing(Condition.FAILURES, Condition.TIMEOUT_CONSUMERS);
+    }
+
+    @Test
+    public void processingWithShutdownAndTimeouts() throws IOException, InterruptedException {
+        runProcessing(Condition.SHUTDOWN_CONSUMERS, Condition.TIMEOUT_CONSUMERS);
+    }
+
+    @Test
+    public void processingWithFailuresAndShutdownAndTimeouts() throws IOException, InterruptedException {
+        runProcessing(Condition.FAILURES, Condition.SHUTDOWN_CONSUMERS, Condition.TIMEOUT_CONSUMERS);
+    }
+
+    public void runProcessing(Condition... conditions) throws IOException, InterruptedException {
+        runProcessing(Arrays.asList(conditions));
     }
 
     // If you need to debug this add 'log4j.logger.com.cerner.common.kafka=DEBUG' to log4j.properties in src/test/resources
     // Save output to a file as there will be a lot
-    public void runProcessing(boolean shutdownConsumers) throws IOException, InterruptedException {
+    public void runProcessing(Collection<Condition> conditions) throws IOException, InterruptedException {
+        boolean failures = conditions.contains(Condition.FAILURES);
+        boolean shutdownConsumers = conditions.contains(Condition.SHUTDOWN_CONSUMERS);
+        boolean timeoutConsumers= conditions.contains(Condition.TIMEOUT_CONSUMERS);
+
         AtomicBoolean finishedProcessing = new AtomicBoolean(false);
         Map<RecordId, List<ConsumerAction>> recordHistory = new ConcurrentHashMap<>();
 
@@ -124,12 +169,18 @@ public class ProcessingKafkaConsumerITest {
         consumerProperties.putAll(CONSUMER_PROPERTIES);
         consumerProperties.setProperty(ConsumerConfig.GROUP_ID_CONFIG, "processing-group-" + name.getMethodName());
 
+        if (timeoutConsumers) {
+            consumerProperties.setProperty(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG,
+                    String.valueOf(CONSUMER_POLL_INTERVAL_TIMEOUT));
+        }
         ProcessingConfig config = new ProcessingConfig(consumerProperties);
+
+        double failPercentage = failures ? FAIL_PERCENTAGE : 0.0;
 
         List<ConsumerThread> threads = new ArrayList<>();
         for(int i=0; i<CONSUMERS; i++) {
             ConsumerThread thread = new ConsumerThread("consumer" + i, config, topicList, shutdownConsumers,
-                    recordHistory, finishedProcessing);
+                    failPercentage, recordHistory, finishedProcessing);
             threads.add(thread);
         }
 
@@ -143,6 +194,8 @@ public class ProcessingKafkaConsumerITest {
 
         int writtenRecords = 0;
         for(String topic : topicList) {
+            LOGGER.info("Writing {} messages to topic {}", MESSAGES_PER_TOPIC, topic);
+
             for(int message=0; message < MESSAGES_PER_TOPIC; message++) {
 
                 int partition = message % PARTITIONS;
@@ -163,7 +216,9 @@ public class ProcessingKafkaConsumerITest {
 
         // Start consumers
         Random random = new Random();
-        for(ConsumerThread thread : threads) {
+        for(int i=0; i<CONSUMERS; i++) {
+            ConsumerThread thread = threads.get(i);
+            LOGGER.info("Starting consumer {} of {}", i + 1, CONSUMERS);
             thread.start();
             long staggerTime = (long) (random.nextFloat() * CONSUMER_STARTUP_STAGGER_TIME_MAX);
             Thread.sleep(staggerTime);
@@ -172,14 +227,14 @@ public class ProcessingKafkaConsumerITest {
         // Processing loop
         long nextHistoryCheck = System.currentTimeMillis() + HISTORY_CHECK_TIME;
         int committedRecords = recordsWithAction(recordHistory, Action.COMMITTED);
-        LOGGER.debug("Committed records: {} of {}", committedRecords, writtenRecords);
+        LOGGER.info("Committed records: {} of {}", committedRecords, writtenRecords);
 
         while(committedRecords < writtenRecords) {
             Thread.sleep(1000L);
 
             if (System.currentTimeMillis() >= nextHistoryCheck) {
                 // Verify the history is as we expect (excluding terminal conditions)
-                verifyHistory(recordHistory, false, shutdownConsumers);
+                verifyHistory(recordHistory, false, false);
 
                 for(Map.Entry<RecordId, List<ConsumerAction>> entry : recordHistory.entrySet()) {
                     LOGGER.debug("Record history: {} - {}", entry.getKey(), entry.getValue());
@@ -195,8 +250,8 @@ public class ProcessingKafkaConsumerITest {
             }
 
             committedRecords = recordsWithAction(recordHistory, Action.COMMITTED);
-            LOGGER.debug("Committed records: {} of {}", committedRecords, writtenRecords);
-            LOGGER.debug("Processed records: {} of {}", recordsWithAction(recordHistory, Action.ACKED), writtenRecords);
+            LOGGER.info("Committed records: {} of {}", committedRecords, writtenRecords);
+            LOGGER.info("Processed records: {} of {}", recordsWithAction(recordHistory, Action.ACKED), writtenRecords);
         }
 
         finishedProcessing.set(true);
@@ -206,7 +261,7 @@ public class ProcessingKafkaConsumerITest {
         }
 
         // Verify the history is as we expect (including terminal conditions)
-        verifyHistory(recordHistory, true, shutdownConsumers);
+        verifyHistory(recordHistory, true, !(shutdownConsumers || timeoutConsumers));
 
         // Cleanup threads, if there are any problems just log a warning since the test was otherwise successful
         for(ConsumerThread thread : threads) {
@@ -243,7 +298,7 @@ public class ProcessingKafkaConsumerITest {
         return false;
     }
 
-    private void verifyHistory(Map<RecordId, List<ConsumerAction>> recordHistory, boolean end, boolean shutdownConsumers) {
+    private void verifyHistory(Map<RecordId, List<ConsumerAction>> recordHistory, boolean end, boolean verifyLastAction) {
         for(Map.Entry<RecordId, List<ConsumerAction>> recordHist : recordHistory.entrySet()) {
             int read = 0;
             int acked = 0;
@@ -281,13 +336,6 @@ public class ProcessingKafkaConsumerITest {
                 }
             }
 
-            // Each unique consumer should only ack a given record once. Skip this verification if consumers are being shutdown
-            // since the assignment can potential change back to a previous consumer.
-            if (!shutdownConsumers) {
-                assertThat("Record " + recordHist.getKey() + " was acked more than once by a consumer. History = " + actionHistory,
-                        acked, is(ackedBy.size()));
-            }
-
             // Each record should be read prior to ack or fail
             assertThat("Record " + recordHist.getKey() + " read count is less than acked+failed. History = " + actionHistory,
                     read, is(greaterThanOrEqualTo(acked + failed)));
@@ -297,14 +345,16 @@ public class ProcessingKafkaConsumerITest {
                 assertThat("Record " + recordHist.getKey() + " never saw an ack in its history " + actionHistory,
                     acked, is(greaterThanOrEqualTo(1)));
 
-                // Verify record was only committed once.
-                assertThat("Record " + recordHist.getKey() + " was not committed exactly once. History = " + actionHistory,
-                        committed, is(1));
+                // Verify record was committed at least once.
+                assertThat("Record " + recordHist.getKey() + " was not committed at least once. History = " + actionHistory,
+                        committed, is(greaterThanOrEqualTo(1)));
 
-                // The last action for each record should always be a commit.
-                Action lastAction = actionHistory.get(actionHistory.size() - 1).getAction();
-                assertThat("Record " + recordHist.getKey() + " final action was not commit. History = " + actionHistory,
-                        lastAction, is(Action.COMMITTED));
+                if (verifyLastAction) {
+                    // Verify that the last action for each record is a commit.
+                    Action lastAction = actionHistory.get(actionHistory.size() - 1).getAction();
+                    assertThat("Record " + recordHist.getKey() + " final action was not commit. History = " + actionHistory,
+                            lastAction, is(Action.COMMITTED));
+                }
             }
         }
     }
@@ -405,6 +455,7 @@ public class ProcessingKafkaConsumerITest {
         private final ProcessingConfig config;
         private final Set<String> topics;
         private final boolean shutdown;
+        private final double failPercentage;
         private final Map<RecordId, List<ConsumerAction>> recordHistory;
         private final AtomicBoolean finishedProcessing;
         private final Map<RecordId, Long> recordsToBeProcessed = new HashMap<>();
@@ -412,12 +463,13 @@ public class ProcessingKafkaConsumerITest {
         private final Set<RecordId> recordsCommittedDuringAck = ConcurrentHashMap.newKeySet();
         private volatile boolean ackInProgress;
 
-        public ConsumerThread(String id, ProcessingConfig config, Set<String> topics, boolean shutdown,
+        public ConsumerThread(String id, ProcessingConfig config, Set<String> topics, boolean shutdown, double failPercentage,
                               Map<RecordId, List<ConsumerAction>> recordHistory, AtomicBoolean finishedProcessing) {
             this.id = id;
             this.config = config;
             this.topics = topics;
             this.shutdown = shutdown;
+            this.failPercentage = failPercentage;
             this.recordHistory = recordHistory;
             this.finishedProcessing = finishedProcessing;
         }
@@ -437,15 +489,16 @@ public class ProcessingKafkaConsumerITest {
                         initializeConsumer();
 
                     if (shutdown && nextConsumerShutdownTime <= currentTime) {
-                        LOGGER.debug("{} shutting down consumer", id);
-                        IOUtils.closeQuietly(consumer);
-                        consumer = null;
+                        long sleepTime = (long) (random.nextFloat() * CONSUMER_REINIT_WAIT_TIME_MAX);
+                        LOGGER.info("Shutting down {} for {} ms", id, sleepTime);
+                        try {
+                            IOUtils.closeQuietly(consumer);
+                        } finally {
+                            consumer = null;
+                        }
                         recordsToBeProcessed.clear();
                         recordsToBeCommitted.clear();
 
-                        long sleepTime = (long) (random.nextFloat() * CONSUMER_REINIT_WAIT_TIME_MAX);
-
-                        LOGGER.debug("{} sleeping for {}ms", id, sleepTime);
                         Thread.sleep(sleepTime);
 
                         continue;
@@ -472,10 +525,19 @@ public class ProcessingKafkaConsumerITest {
                             LOGGER.debug("{} removing record {}", id, recordId);
                             recordsToBeProcessed.remove(recordId);
 
-                            if (FAIL_PERCENTAGE <= random.nextDouble()) {
+                            if (failPercentage <= random.nextDouble()) {
                                 LOGGER.debug("{} ack'ing record {}", id, recordId);
                                 recordsToBeCommitted.add(recordId);
-                                if (consumer.ack(unprocessedRecord)) {
+                                boolean acked = false;
+                                try {
+                                    acked = consumer.ack(unprocessedRecord);
+                                } catch (CommitFailedException e) {
+                                    // Still acked, although not committed
+                                    addRecordHistory(recordId, Action.ACKED);
+                                    throw e;
+                                }
+
+                                if (acked) {
                                     // Mark as acked prior to committed
                                     addRecordHistory(recordId, Action.ACKED);
                                     for (RecordId committedRecordId : recordsCommittedDuringAck) {
