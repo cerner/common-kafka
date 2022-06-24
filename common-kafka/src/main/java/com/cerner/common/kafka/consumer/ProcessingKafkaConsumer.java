@@ -723,7 +723,7 @@ public class ProcessingKafkaConsumer<K, V> implements Closeable {
     @Override
     public void close() throws IOException {
         // Close all partitions
-        partitions.values().forEach(partition -> IOUtils.closeQuietly(partition));
+        closeAllPartitionsQuitely();
 
         try {
             commitOffsets();
@@ -761,8 +761,7 @@ public class ProcessingKafkaConsumer<K, V> implements Closeable {
              * because we may have been disconnected and missed an entire group generation
              * during which another consumer might have been assigned the partition and committed offsets.
              */
-            partitions.values()
-                    .forEach(partition -> IOUtils.closeQuietly(partition));
+            closeAllPartitionsQuitely();
 
             partitions.clear();
 
@@ -777,6 +776,10 @@ public class ProcessingKafkaConsumer<K, V> implements Closeable {
 
     ConsumerRebalanceListener getRebalanceListener() {
         return new ProcessingRebalanceListener();
+    }
+
+    private void closeAllPartitionsQuitely(){
+        partitions.values().forEach(partition -> IOUtils.closeQuietly(partition));
     }
 }
 
