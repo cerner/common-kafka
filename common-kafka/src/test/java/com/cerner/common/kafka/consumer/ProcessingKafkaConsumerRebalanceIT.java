@@ -88,7 +88,7 @@ public class ProcessingKafkaConsumerRebalanceIT {
     }
 
 
-    @Test
+    @Test(timeout = 300000)
     public void deadlockFreeProcessingAfterMissedGeneration() throws IOException, InterruptedException {
 
         Map<RecordId, List<ConsumerAction>> recordHistory = new ConcurrentHashMap<>();
