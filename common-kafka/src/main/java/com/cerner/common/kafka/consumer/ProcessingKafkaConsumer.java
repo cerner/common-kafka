@@ -495,7 +495,7 @@ public class ProcessingKafkaConsumer<K, V> implements Closeable {
      * assigned to this consumer will be ignored. Note that the partition assignment can be empty immediately after
      * {@link #subscribe(Collection) subscribing to topics} prior to a {@link #nextRecord(long) poll of sufficient
      * duration}, or when partitions are in the process of getting reassigned.
-     * 
+     *
      * @param offsets the offsets to reset the consumer to
      * @throws IllegalArgumentException if {@code offsets} is {@code null}
      * @throws KafkaException if there is an issue resetting the offsets
@@ -626,7 +626,7 @@ public class ProcessingKafkaConsumer<K, V> implements Closeable {
 
     /**
      * Commit offsets if we meet the size threshold
-     * 
+     *
      * @param processingPartition partition to consider committing our processing offsets for
      *
      * @throws KafkaException
@@ -723,7 +723,7 @@ public class ProcessingKafkaConsumer<K, V> implements Closeable {
     @Override
     public void close() throws IOException {
         // Close all partitions
-        partitions.values().forEach(partition -> IOUtils.closeQuietly(partition));
+        closeAllPartitionsQuitely();
 
         try {
             commitOffsets();
@@ -755,17 +755,18 @@ public class ProcessingKafkaConsumer<K, V> implements Closeable {
             LOGGER.info("Rebalance [{}] is in progress. Old partitions: {} New Partitions: {}", REBALANCE_COUNTER.count(),
                     partitions.keySet(), partitionsAssigned);
 
-            // Close all partitions we will no longer use
-            partitions.values().stream()
-                    .filter(partition -> !partitionsAssigned.contains(partition.getTopicPartition()))
-                    .forEach(partition -> IOUtils.closeQuietly(partition));
+            /**
+             * We must reset the local partition state (cached offsets) for all partitions,
+             * even if the last assignment we saw also included these partitions,
+             * because we may have been disconnected and missed an entire group generation
+             * during which another consumer might have been assigned the partition and committed offsets.
+             */
+            closeAllPartitionsQuitely();
 
-            // Remove all partitions we are no longer assigned to
-            partitions.keySet().retainAll(partitionsAssigned);
+            partitions.clear();
 
-            // Add all partitions that we don't already have
             try {
-                partitionsAssigned.stream().filter(tp -> !partitions.containsKey(tp))
+                partitionsAssigned
                         .forEach(tp -> partitions.put(tp, buildPartition(tp, config, consumer)));
             } catch (IllegalStateException e) {
                 LOGGER.error("Failed to initialize processing partition", e);
@@ -775,6 +776,10 @@ public class ProcessingKafkaConsumer<K, V> implements Closeable {
 
     ConsumerRebalanceListener getRebalanceListener() {
         return new ProcessingRebalanceListener();
+    }
+
+    private void closeAllPartitionsQuitely(){
+        partitions.values().forEach(partition -> IOUtils.closeQuietly(partition));
     }
 }
 
