@@ -24,12 +24,13 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -165,7 +166,7 @@ public class ProcessingKafkaConsumer<K, V> implements Closeable {
     /**
      * Maintains the state of all the partitions our consumer is assigned to
      */
-    protected final Map<TopicPartition, ProcessingPartition<K, V>> partitions = new ConcurrentHashMap<>();
+    protected final Map<TopicPartition, ProcessingPartition<K, V>> partitions = Collections.synchronizedMap(new LinkedHashMap<>());
 
     /**
      * The partition to process from next
