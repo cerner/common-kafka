@@ -1,7 +1,6 @@
 package com.cerner.common.kafka.consumer;
 
-import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.Matchers.empty;
+import static org.hamcrest.Matchers.*;
 import static org.hamcrest.core.Is.is;
 import static org.hamcrest.core.IsInstanceOf.instanceOf;
 import static org.hamcrest.core.IsNull.nullValue;
@@ -1170,7 +1169,7 @@ public class ProcessingKafkaConsumerTest {
         TopicPartition newPartition = new TopicPartition("new-topic", 0);
         when(consumer.committed(newPartition)).thenReturn(new OffsetAndMetadata(0L));
         processingConsumer.rebalanceListener.onPartitionsAssigned(Arrays.asList(topicPartition, newPartition));
-        assertThat(processingConsumer.partitions.keySet(), contains(topicPartition, newPartition));
+        assertThat(processingConsumer.partitions.keySet(), containsInAnyOrder(topicPartition, newPartition));
         assertThat(ProcessingKafkaConsumer.REBALANCE_COUNTER.count(), is(rebalanceCount + 1));
     }
 
