@@ -207,13 +207,17 @@ public class KafkaProducerPool<K, V> implements Closeable {
                 } else {
                     int producerConcurrency = getProducerConcurrency(producerProperties);
 
+                    // clone the properties in case creating the Producer mutates them (like happens
+                    // when using opentelemtry-agent) which breaks the cache key
+                    Properties originalProperties = (Properties) producerProperties.clone();
+
                     // Create a new group of producers.
                     producers = new ArrayList<>(producerConcurrency);
                     for (int i = 0; i < producerConcurrency; ++i) {
                         producers.add(createProducer(producerProperties));
                     }
 
-                    pool.put(producerProperties, producers);
+                    pool.put(originalProperties, producers);
                 }
             } finally {
                 writeLock.unlock();
