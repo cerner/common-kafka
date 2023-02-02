@@ -8,9 +8,8 @@ import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.core.Is.is;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyMap;
-import static org.mockito.Mockito.atLeast;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -28,9 +27,9 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.stream.Collectors;
 
-import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.clients.consumer.OffsetResetStrategy;
 import org.apache.kafka.common.KafkaException;
@@ -38,33 +37,28 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.log4j.AppenderSkeleton;
 import org.apache.log4j.spi.LoggingEvent;
 import org.apache.log4j.spi.RootLogger;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 @SuppressWarnings("unchecked")
 public class ProcessingPartitionTest {
 
     private TestLogAppender logAppender;
 
-    @Rule
-    public final ExpectedException exception = ExpectedException.none();
-
     @Mock
-    Consumer<String, String> consumer;
+    KafkaConsumer<String, String> consumer;
 
     Properties properties;
     ProcessingConfig config;
     TopicPartition topicPartition;
     MockProcessingPartition<String, String> partition;
 
-    @Before
+    @BeforeEach
     public void before() {
         properties = new Properties();
         properties.setProperty(ConsumerConfig.GROUP_ID_CONFIG, "my-group");
@@ -73,7 +67,8 @@ public class ProcessingPartitionTest {
         config = new ProcessingConfig(properties);
         topicPartition = new TopicPartition("topic", 1);
 
-        when(consumer.committed(topicPartition)).thenReturn(new OffsetAndMetadata(0L));
+        when(consumer.committed(Collections.singleton(topicPartition))).
+                thenReturn(Collections.singletonMap(topicPartition, new OffsetAndMetadata(0L)));
 
         partition = new MockProcessingPartition<>(topicPartition, config, consumer);
 
@@ -81,7 +76,7 @@ public class ProcessingPartitionTest {
         RootLogger.getRootLogger().addAppender(logAppender);
     }
 
-    @After
+    @AfterEach
     public void after() {
         RootLogger.getRootLogger().removeAppender(logAppender);
     }
@@ -494,11 +489,12 @@ public class ProcessingPartitionTest {
 
     @Test
     public void getLastCommittedOffset_noCommittedOffset() {
-        when(consumer.committed(topicPartition)).thenReturn(null);
+        when(consumer.committed(Collections.singleton(topicPartition))).
+                thenReturn(Collections.singletonMap(topicPartition, null));
 
         // We set the reset strategy to earliest so this should give earliest offset
         assertThat(partition.getLastCommittedOffset(), is(partition.getEarliestOffset()));
-        verify(consumer).commitSync(Collections.singletonMap(topicPartition, any(OffsetAndMetadata.class)));
+        verify(consumer).commitSync(anyMap());
     }
 
     @Test
@@ -509,7 +505,9 @@ public class ProcessingPartitionTest {
 
         partition = new MockProcessingPartition<>(topicPartition, config, consumer);
 
-        when(consumer.committed(topicPartition)).thenReturn(null);
+        when(consumer.committed(Collections.singleton(topicPartition))).
+                thenReturn(Collections.singletonMap(topicPartition, null));
+
 
         // We set the reset strategy to earliest so this should give earliest offset
         assertThat(partition.getLastCommittedOffset(), is(partition.getEarliestOffset()));
@@ -518,7 +516,8 @@ public class ProcessingPartitionTest {
 
     @Test
     public void getLastCommittedOffset_committedOffsetBeforeEarliest() {
-        when(consumer.committed(topicPartition)).thenReturn(new OffsetAndMetadata(0L));
+        when(consumer.committed(Collections.singleton(topicPartition))).
+                thenReturn(Collections.singletonMap(topicPartition, new OffsetAndMetadata(0L)));
 
         // Increase earliest broker offset to be above committed
         partition.earliestBrokerOffset = 1L;
@@ -527,12 +526,13 @@ public class ProcessingPartitionTest {
         // Since our offset is out of range we will fall back to the offset based on our reset strategy
         // We set the reset strategy to earliest so this should give earliest offset
         assertThat(partition.getLastCommittedOffset(), is(1L));
-        verify(consumer).commitSync(Collections.singletonMap(topicPartition, any(OffsetAndMetadata.class)));
+        verify(consumer).commitSync(anyMap());
     }
 
     @Test
     public void getLastCommittedOffset_committedOffsetEqualsEarliest() {
-        when(consumer.committed(topicPartition)).thenReturn(new OffsetAndMetadata(0L));
+        when(consumer.committed(Collections.singleton(topicPartition))).
+                thenReturn(Collections.singletonMap(topicPartition, new OffsetAndMetadata(0L)));
         partition.earliestBrokerOffset = 0L;
         partition.latestBrokerOffset = 100L;
 
@@ -542,7 +542,8 @@ public class ProcessingPartitionTest {
 
     @Test
     public void getLastCommittedOffset_committedOffsetAfterLatest() {
-        when(consumer.committed(topicPartition)).thenReturn(new OffsetAndMetadata(200L));
+        when(consumer.committed(Collections.singleton(topicPartition)))
+                .thenReturn(Collections.singletonMap(topicPartition, new OffsetAndMetadata(200L)));
 
         partition.earliestBrokerOffset = 25L;
 
@@ -552,12 +553,13 @@ public class ProcessingPartitionTest {
         // Since our offset is out of range we will fall back to the offset based on our reset strategy
         // We set the reset strategy to earliest so this should give earliest offset
         assertThat(partition.getLastCommittedOffset(), is(25L));
-        verify(consumer).commitSync(Collections.singletonMap(topicPartition, any(OffsetAndMetadata.class)));
+        verify(consumer).commitSync(anyMap());
     }
 
     @Test
     public void getLastCommittedOffset_committedOffsetEqualsLatest() {
-        when(consumer.committed(topicPartition)).thenReturn(new OffsetAndMetadata(123L));
+        when(consumer.committed(Collections.singleton(topicPartition))).
+                thenReturn(Collections.singletonMap(topicPartition, new OffsetAndMetadata(123L)));
         partition.earliestBrokerOffset = 10L;
         partition.latestBrokerOffset = 123L;
 
@@ -567,7 +569,8 @@ public class ProcessingPartitionTest {
 
     @Test
     public void getLastCommittedOffset_committedOffset() {
-        when(consumer.committed(topicPartition)).thenReturn(new OffsetAndMetadata(123L));
+        when(consumer.committed(Collections.singleton(topicPartition))).
+                thenReturn(Collections.singletonMap(topicPartition, new OffsetAndMetadata(123L)));
         partition.earliestBrokerOffset = 100L;
         partition.latestBrokerOffset = 250L;
 
@@ -577,7 +580,8 @@ public class ProcessingPartitionTest {
 
     @Test
     public void getLastCommittedOffset_noConsumerCommit_failedToCommit() {
-        when(consumer.committed(topicPartition)).thenReturn(null);
+        when(consumer.committed(Collections.singleton(topicPartition))).
+                thenReturn(Collections.singletonMap(topicPartition, null));
         partition.earliestBrokerOffset = 123L;
         doThrow(new KafkaException("unable to commit")).when(consumer).commitSync(anyMap());
 
@@ -646,7 +650,7 @@ public class ProcessingPartitionTest {
         public Long earliestBrokerOffset;
         public Long latestBrokerOffset;
 
-        public MockProcessingPartition(TopicPartition topicPartition, ProcessingConfig config, Consumer<K, V> consumer) {
+        public MockProcessingPartition(TopicPartition topicPartition, ProcessingConfig config, KafkaConsumer<K, V> consumer) {
             super(topicPartition, config, consumer);
         }
 

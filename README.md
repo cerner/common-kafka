@@ -12,12 +12,6 @@ For Maven, add the following,
     <artifactId>common-kafka</artifactId>
     <version>2.0</version>
 </dependency>
-<!-- For admin utilities -->
-<dependency>
-    <groupId>com.cerner.common.kafka</groupId>
-    <artifactId>common-kafka-admin</artifactId>
-    <version>2.0</version>
-</dependency>
 <!-- For connect utilities -->
 <dependency>
     <groupId>com.cerner.common.kafka</groupId>
@@ -40,8 +34,6 @@ The following modules are available for use,
 [producers](http://kafka.apache.org/0102/javadoc/org/apache/kafka/clients/producer/KafkaProducer.html)
 and [consumers](http://kafka.apache.org/0102/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html)
 in the [kafka-clients](https://github.com/apache/kafka/tree/trunk/clients) library.
-* [common-kafka-admin](common-kafka-admin/README.md): Simplifies some commonly performed administrative
-operations.
 * [common-kafka-connect](common-kafka-connect/README.md): Contains
 [Kafka Connect](http://kafka.apache.org/documentation.html#connect) component implementations.
 * [common-kafka-test](common-kafka-test/README.md): Provides infrastructure for integration or "heavy"
@@ -53,13 +45,11 @@ Please refer to the project-specific README documentation for content details.
 
 The 2.0 release of common-kafka uses the following dependency versions.
 
-* [Kafka](http://kafka.apache.org/): 2.2.1
+* [Kafka](http://kafka.apache.org/): 3.2.0
 * [Metrics](http://metrics.dropwizard.io/): 2.2.0
-* [Scala](https://scala-lang.org/): 2.12.8
-* [ZooKeeper](https://zookeeper.apache.org/): 3.4.14
+* [Scala](https://scala-lang.org/): 2.13.5
 
-Note that the Scala and ZooKeeper dependencies are only applicable for common-kafka-admin and
-common-kafka-test.
+Note that the Scala dependency is only applicable for common-kafka-test.
 
 ## Contribute
 

@@ -1,8 +1,9 @@
 package com.cerner.common.kafka.consumer;
 
 import com.cerner.common.kafka.KafkaTests;
-import com.cerner.common.kafka.admin.KafkaAdminClient;
 import com.cerner.common.kafka.consumer.assignors.FairAssignor;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -15,32 +16,25 @@ import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestName;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Properties;
-import java.util.Random;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.core.Is.is;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.MatcherAssert.assertThat;
 
 /**
  * Integration test for a specific deadlocking condition in ProcessingKafkaConsumer client after repeated rebalances.
@@ -58,15 +52,18 @@ public class ProcessingKafkaConsumerRebalanceIT {
 
     private static Properties CONSUMER_PROPERTIES = new Properties();
 
-    private static KafkaAdminClient kafkaAdminClient;
+    private static AdminClient kafkaAdminClient;
 
-    @Rule
-    public TestName name = new TestName();
+    private String name;
 
-    @BeforeClass
+    @BeforeAll
     public static void startup() throws Exception {
         KafkaTests.startTest();
-        kafkaAdminClient = new KafkaAdminClient(KafkaTests.getProps());
+        Properties kafkaTestProps = KafkaTests.getProps();
+        if (kafkaTestProps == null) {
+            throw new RuntimeException("KafkaTests.getProps() returned null");
+        }
+        kafkaAdminClient = AdminClient.create(KafkaTests.getProps());
 
         CONSUMER_PROPERTIES.putAll(KafkaTests.getProps());
         CONSUMER_PROPERTIES.setProperty(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, "3000");
@@ -81,34 +78,39 @@ public class ProcessingKafkaConsumerRebalanceIT {
         CONSUMER_PROPERTIES.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
     }
 
-    @AfterClass
+    @BeforeEach
+    public void setTestName(TestInfo testInfo){
+        name = testInfo.getDisplayName();
+    }
+
+    @AfterAll
     public static void shutdown() throws Exception {
         kafkaAdminClient.close();
         KafkaTests.endTest();
     }
 
 
-    @Test(timeout = 300000)
+    @Test
+    @Timeout(300)
     public void deadlockFreeProcessingAfterMissedGeneration() throws IOException, InterruptedException {
 
         Map<RecordId, List<ConsumerAction>> recordHistory = new ConcurrentHashMap<>();
 
-        Set<String> topicList = new HashSet<>();
-
-        String topic = "topic-1" + name.getMethodName();
-        topicList.add(topic);
+        Set<NewTopic> topicSet = new HashSet<>();
+        String topicName = "topic-1" + name;
+        topicSet.add(new NewTopic(topicName, 1, (short) 1));
 
         // Only 1 replica since our testing only has 1 broker
-        kafkaAdminClient.createTopic(topic, PARTITIONS, 1, new Properties());
+        kafkaAdminClient.createTopics(topicSet);
 
         // Setup consumer threads
         Properties consumerProperties = new Properties();
         consumerProperties.putAll(CONSUMER_PROPERTIES);
-        consumerProperties.setProperty(ConsumerConfig.GROUP_ID_CONFIG, "processing-group-" + name.getMethodName());
+        consumerProperties.setProperty(ConsumerConfig.GROUP_ID_CONFIG, "processing-group-" + name);
         ProcessingConfig config = new ProcessingConfig(consumerProperties);
 
         AtomicBoolean finishedProcessingOutage = new AtomicBoolean(false);
-        ConsumerThread outageThread = new ConsumerThread("outage_consumer", config, topicList,
+        ConsumerThread outageThread = new ConsumerThread("outage_consumer", config, topicSet,
                 recordHistory, finishedProcessingOutage, true);
 
         // Write some data
@@ -120,7 +122,7 @@ public class ProcessingKafkaConsumerRebalanceIT {
         Producer<String, String> producer = new KafkaProducer<String, String>(producerProperties);
 
         int writtenRecords = 0;
-        writtenRecords = publishRecords(writtenRecords, MESSAGES_PER_TOPIC, producer, topic, recordHistory);
+        writtenRecords = publishRecords(writtenRecords, MESSAGES_PER_TOPIC, producer, topicName, recordHistory);
 
         // Start outage consumer
         outageThread.start();
@@ -132,7 +134,7 @@ public class ProcessingKafkaConsumerRebalanceIT {
 
         //Start other thread, triggering rebalance which outage thread won't join
         AtomicBoolean finishedProcessing1 = new AtomicBoolean(false);
-        ConsumerThread thread1 = new ConsumerThread("consumer-1", config, topicList,
+        ConsumerThread thread1 = new ConsumerThread("consumer-1", config, topicSet,
                 recordHistory, finishedProcessing1, false);
         thread1.start();
 
@@ -150,7 +152,7 @@ public class ProcessingKafkaConsumerRebalanceIT {
 
         // write some more records to make sure we have new records in each partition so outage consumer
         //  has some messages returned by poll after it rejoins
-        writtenRecords = publishRecords(writtenRecords, MESSAGES_PER_TOPIC, producer, topic, recordHistory);
+        writtenRecords = publishRecords(writtenRecords, MESSAGES_PER_TOPIC, producer, topicName, recordHistory);
 
         // Wait for all written records to be committed
         monitorRecordProcessing(writtenRecords, recordHistory);
@@ -416,7 +418,7 @@ public class ProcessingKafkaConsumerRebalanceIT {
 
         private final String id;
         private final ProcessingConfig config;
-        private final Set<String> topics;
+        private final Set<NewTopic> topics;
         private final Map<RecordId, List<ConsumerAction>> recordHistory;
         private final AtomicBoolean finishedProcessing;
         private final Map<RecordId, Long> recordsToBeProcessed = new HashMap<>();
@@ -427,7 +429,7 @@ public class ProcessingKafkaConsumerRebalanceIT {
         private int recordsProcessed = 0;
         private boolean alreadyHadMyNap = false;
 
-        public ConsumerThread(String id, ProcessingConfig config, Set<String> topics,
+        public ConsumerThread(String id, ProcessingConfig config, Set<NewTopic> topics,
                               Map<RecordId, List<ConsumerAction>> recordHistory, AtomicBoolean finishedProcessing, boolean simulateOutage) {
             this.id = id;
             this.config = config;
@@ -531,7 +533,9 @@ public class ProcessingKafkaConsumerRebalanceIT {
         private void initializeConsumer() {
             consumer = new CommitTrackingProcessingKafkaConsumer<>(config);
             consumerId = consumer.toString(); // generate a unique id
-            consumer.subscribe(topics);
+            List<String> topicNames = new ArrayList<>();
+            topics.forEach(t -> topicNames.add(t.name()));
+            consumer.subscribe(topicNames);
         }
 
         @Override

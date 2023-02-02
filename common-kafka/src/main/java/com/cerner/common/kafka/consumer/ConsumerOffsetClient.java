@@ -222,7 +222,7 @@ public class ConsumerOffsetClient implements Closeable {
         if (topicPartition == null)
             throw new IllegalArgumentException("topicPartition cannot be null");
 
-        OffsetAndMetadata offsetAndMetadata = consumer.committed(topicPartition);
+        OffsetAndMetadata offsetAndMetadata = consumer.committed(Collections.singleton(topicPartition)).get(topicPartition);
         return offsetAndMetadata == null ? -1L : offsetAndMetadata.offset();
     }
 

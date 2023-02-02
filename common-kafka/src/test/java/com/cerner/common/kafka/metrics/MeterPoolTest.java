@@ -4,21 +4,22 @@ import com.yammer.metrics.Metrics;
 import com.yammer.metrics.core.Meter;
 import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.MetricsRegistry;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.not;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Tests for {@link MeterPool}.
  */
 public class MeterPoolTest {
 
-    @Before
+    @BeforeEach
     public void clearMetrics() {
         MetricsRegistry metricsRegistry = Metrics.defaultRegistry();
         for (MetricName metric : metricsRegistry.allMetrics().keySet()) {
@@ -26,19 +27,22 @@ public class MeterPoolTest {
         }
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void nullClass() {
-        new MeterPool(null, "name");
+        assertThrows(IllegalArgumentException.class,
+                () -> new MeterPool(null, "name"));
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void nullName() {
-        new MeterPool(Object.class, null);
+        assertThrows(IllegalArgumentException.class,
+                () -> new MeterPool(Object.class, null));
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void getMeterNullScope() {
-        new MeterPool(Object.class, "name").getMeter(null);
+        assertThrows(IllegalArgumentException.class,
+                () -> new MeterPool(Object.class, "name").getMeter(null));
     }
 
     @Test

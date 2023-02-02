@@ -1,21 +1,16 @@
 package com.cerner.common.kafka.consumer;
 
+import static java.util.Collections.singleton;
+import static java.util.Collections.singletonMap;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.core.Is.is;
 import static org.hamcrest.core.IsInstanceOf.instanceOf;
 import static org.hamcrest.core.IsNull.nullValue;
-import static org.junit.Assert.assertThat;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyLong;
-import static org.mockito.Matchers.anyMap;
-import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.atLeastOnce;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -33,7 +28,6 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -43,23 +37,22 @@ import org.apache.kafka.clients.consumer.OffsetResetStrategy;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
 
 import com.cerner.common.kafka.consumer.ProcessingPartitionTest.MockProcessingPartition;
+import org.mockito.junit.jupiter.MockitoExtension;
 
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 @SuppressWarnings("unchecked")
 public class ProcessingKafkaConsumerTest {
 
     @Mock
-    Consumer<String, String> consumer;
+    KafkaConsumer<String, String> consumer;
     @Captor
     ArgumentCaptor<Map<TopicPartition, OffsetAndMetadata>> commitCaptor;
 
@@ -85,20 +78,20 @@ public class ProcessingKafkaConsumerTest {
     ConsumerRecord<String, String> record5;
     ConsumerRecord<String, String> record6;
 
-    @Before
+    @BeforeEach
     public void before() {
         topicPartition = new TopicPartition(topic, partition);
-        topicPartitions = Collections.singleton(topicPartition);
+        topicPartitions = singleton(topicPartition);
 
         // Single record - for simple use cases
         record1 = new ConsumerRecord<>(topic, partition, offset, key, value);
-        ConsumerRecords<String, String> firstSet = new ConsumerRecords<>(Collections.singletonMap(topicPartition,
+        ConsumerRecords<String, String> firstSet = new ConsumerRecords<>(singletonMap(topicPartition,
                 Arrays.asList(record1)));
 
         // More records
         record2 = new ConsumerRecord<>(topic, partition, offset + 1, key + 1, value + 1);
         record3 = new ConsumerRecord<>(topic, partition, offset + 2, key + 2, value + 2);
-        ConsumerRecords<String, String> secondSet = new ConsumerRecords<>(Collections.singletonMap(topicPartition,
+        ConsumerRecords<String, String> secondSet = new ConsumerRecords<>(singletonMap(topicPartition,
                 Arrays.asList(record2, record3)));
 
         // Records with different topics/partitions
@@ -112,14 +105,23 @@ public class ProcessingKafkaConsumerTest {
         thirdSetMap.put(new TopicPartition(record6.topic(), record6.partition()), Arrays.asList(record6));
         ConsumerRecords<String, String> thirdSet = new ConsumerRecords<>(thirdSetMap);
 
-        when(consumer.poll(any(Duration.class))).thenReturn(firstSet).thenReturn(secondSet).thenReturn(thirdSet);
-        when(consumer.committed(topicPartition)).thenReturn(new OffsetAndMetadata(offset));
-        when(consumer.committed(new TopicPartition(record4.topic(), record4.partition())))
-                .thenReturn(new OffsetAndMetadata(record4.offset()));
-        when(consumer.committed(new TopicPartition(record5.topic(), record5.partition())))
-                .thenReturn(new OffsetAndMetadata(record5.offset()));
-        when(consumer.committed(new TopicPartition(record6.topic(), record6.partition())))
-                .thenReturn(new OffsetAndMetadata(record6.offset()));
+        // This stubbing is set to lenient and included here because it is needed for 24 of the test cases
+        lenient().when(consumer.poll(any(Duration.class))).thenReturn(firstSet).thenReturn(secondSet).thenReturn(thirdSet);
+
+        when(consumer.committed(singleton(topicPartition)))
+                .thenReturn(singletonMap(topicPartition, new OffsetAndMetadata(offset)));
+
+        TopicPartition topicPartition4 = new TopicPartition(record4.topic(), record4.partition());
+        when(consumer.committed(singleton(topicPartition4)))
+                .thenReturn(singletonMap(topicPartition4, new OffsetAndMetadata(record4.offset())));
+
+        TopicPartition topicPartition5 = new TopicPartition(record5.topic(), record5.partition());
+        when(consumer.committed(singleton(topicPartition5)))
+                .thenReturn(singletonMap(topicPartition5, new OffsetAndMetadata(record5.offset())));
+
+        TopicPartition topicPartition6 = new TopicPartition(record6.topic(), record6.partition());
+        when(consumer.committed(singleton(topicPartition6)))
+                .thenReturn(singletonMap(topicPartition6, new OffsetAndMetadata(record6.offset())));
 
         properties = new Properties();
 
@@ -136,14 +138,18 @@ public class ProcessingKafkaConsumerTest {
         rebuildConsumer();
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void constructorWithConsumer_nullConfig() {
-        new ProcessingKafkaConsumer(null, consumer);
+        assertThrows(IllegalArgumentException.class,
+                () -> new ProcessingKafkaConsumer(null, consumer),
+                "Expected ProcessingKafkaConsumer constructor to throw IllegalArgumentException, but one was not thrown.");
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void constructor_nullConsumer() {
-        new ProcessingKafkaConsumer(config, null);
+        assertThrows(IllegalArgumentException.class,
+                () -> new ProcessingKafkaConsumer(config, null),
+                "Expected ProcessingKafkaConsumer constructor to throw IllegalArgumentException, but one was not thrown.");
     }
 
     @Test
@@ -153,9 +159,11 @@ public class ProcessingKafkaConsumerTest {
         }
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void constructorWithoutConsumer_nullConfig() {
-            new ProcessingKafkaConsumer(null);
+        assertThrows(IllegalArgumentException.class,
+                () -> new ProcessingKafkaConsumer( null),
+                "Expected ProcessingKafkaConsumer constructor to throw IllegalArgumentException, but one was not thrown.");
     }
 
     @Test
@@ -167,11 +175,8 @@ public class ProcessingKafkaConsumerTest {
     public void constructorWithDeserializers_nullConfig() {
         Deserializer<String> keyDeserializer = new StringDeserializer();
         Deserializer<String> valueDeserializer = new StringDeserializer();
-        try {
-            new ProcessingKafkaConsumer(null, keyDeserializer, valueDeserializer);
-            Assert.fail("Expected IllegalArgumentException to be thrown");
-        } catch (IllegalArgumentException e) {
-        }
+        assertThrows(IllegalArgumentException.class,
+                () -> new ProcessingKafkaConsumer(null, keyDeserializer, valueDeserializer));
     }
 
     @Test
@@ -244,10 +249,14 @@ public class ProcessingKafkaConsumerTest {
         TopicPartition topic2Partition1 = new TopicPartition("topic2", 1);
         TopicPartition topic2Partition2 = new TopicPartition("topic2", 2);
 
-        when(consumer.committed(topic1Partition1)).thenReturn(new OffsetAndMetadata(0L));
-        when(consumer.committed(topic1Partition2)).thenReturn(new OffsetAndMetadata(0L));
-        when(consumer.committed(topic2Partition1)).thenReturn(new OffsetAndMetadata(0L));
-        when(consumer.committed(topic2Partition2)).thenReturn(new OffsetAndMetadata(0L));
+        when(consumer.committed(singleton(topic1Partition1)))
+                .thenReturn(singletonMap(topic1Partition1, new OffsetAndMetadata(0L)));
+        when(consumer.committed(singleton(topic1Partition2)))
+                .thenReturn(singletonMap(topic1Partition2, new OffsetAndMetadata(0L)));
+        when(consumer.committed(singleton(topic2Partition1)))
+                .thenReturn(singletonMap(topic2Partition1, new OffsetAndMetadata(0L)));
+        when(consumer.committed(singleton(topic2Partition2)))
+                .thenReturn(singletonMap(topic2Partition2, new OffsetAndMetadata(0L)));
 
         List<TopicPartition> topicPartitions = Arrays.asList(topic1Partition1, topic1Partition2, topic2Partition1,
                 topic2Partition2);
@@ -300,16 +309,20 @@ public class ProcessingKafkaConsumerTest {
         assertThat(processingConsumer.nextRecord(POLL_TIME), is(Optional.empty()));
     }
 
-    @Test(expected = IllegalStateException.class)
+    @Test
     public void nextRecord_unexpectedException() {
         when(consumer.poll(any(Duration.class))).thenThrow(new IllegalStateException());
-        when(consumer.subscription()).thenReturn(Collections.singleton("some.topic"));
-        processingConsumer.nextRecord(POLL_TIME);
+        when(consumer.subscription()).thenReturn(singleton("some.topic"));
+        assertThrows(IllegalStateException.class,
+                () -> processingConsumer.nextRecord(POLL_TIME),
+                "Expected ProcessingKafkaConsumer constructor to throw IllegalStateException, but one was not thrown.");
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void ack_nullTopicPartition() {
-        processingConsumer.ack(null, 0);
+        assertThrows(IllegalArgumentException.class,
+                () -> processingConsumer.ack(null, 0),
+                "Expected ProcessingConsumer.ack to throw IllegalArgumentException, but one was not thrown.");
     }
 
     @Test
@@ -362,27 +375,28 @@ public class ProcessingKafkaConsumerTest {
 
         assertThat(processingConsumer.getCommittableOffsets().isEmpty(), is(true));
 
-        verify(consumer).commitSync(Collections.singletonMap(topicPartition, new OffsetAndMetadata(offset + 1)));
+        verify(consumer).commitSync(singletonMap(topicPartition, new OffsetAndMetadata(offset + 1)));
     }
 
-    @Test(expected = IllegalArgumentException.class)
-    public void ack_topicPartitionIsNull() {
-        processingConsumer.ack(null, 0);
-    }
-
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void ack_topicPartitionIsNull2() {
-        processingConsumer.ack(null);
+        assertThrows(IllegalArgumentException.class,
+                () -> processingConsumer.ack(null),
+                "Expected ProcessingConsumer.ack to throw IllegalArgumentException, but one was not thrown.");
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void fail_topicPartitionIsNull() {
-        processingConsumer.fail(null, 0);
+        assertThrows(IllegalArgumentException.class,
+                () -> processingConsumer.fail(null, 0),
+                "Expected ProcessingConsumer.fail to throw IllegalArgumentException, but one was not thrown.");
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void fail_topicPartitionIsNull2() {
-        processingConsumer.fail(null);
+        assertThrows(IllegalArgumentException.class,
+                () -> processingConsumer.fail(null),
+                "Expected ProcessingConsumer.fail to throw IllegalArgumentException, but one was not thrown.");
     }
 
     @Test
@@ -458,9 +472,11 @@ public class ProcessingKafkaConsumerTest {
         assertThat(processingConsumer.fail(invalidPartition), is(false));
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void resetOffsets_nullOffsets() {
-        processingConsumer.resetOffsets(null);
+        assertThrows(IllegalArgumentException.class,
+                () -> processingConsumer.resetOffsets(null),
+                "Expected ProcessingConsumer.resetOffsets to throw IllegalArgumentException, but one was not thrown.");
     }
 
     @Test
@@ -544,7 +560,7 @@ public class ProcessingKafkaConsumerTest {
 
         processingConsumer.resetOffsets(offsets);
 
-        verify(consumer).commitSync(getCommitOffsets(Collections.singletonMap(a1, 6L)));
+        verify(consumer).commitSync(getCommitOffsets(singletonMap(a1, 6L)));
         verify(consumer, never()).seek(eq(a0), anyLong());
         verify(consumer).seek(a1, 6L);
         verify(consumer, never()).seek(eq(b0), anyLong());
@@ -609,7 +625,7 @@ public class ProcessingKafkaConsumerTest {
 
         processingConsumer.resetOffsets(offsets);
 
-        verify(consumer).commitSync(getCommitOffsets(Collections.singletonMap(a0, 5L)));
+        verify(consumer).commitSync(getCommitOffsets(singletonMap(a0, 5L)));
         verify(consumer).seek(a0, 5L);
         verify(consumer, never()).seek(eq(a1), anyLong());
         verify(consumer, never()).seek(eq(b0), anyLong());
@@ -645,7 +661,7 @@ public class ProcessingKafkaConsumerTest {
         verify(processingPartition_a1).close();
         verify(processingPartition_b0, never()).close();
 
-        assertThat(processingConsumer.partitions, is(Collections.singletonMap(b0, processingPartition_b0)));
+        assertThat(processingConsumer.partitions, is(singletonMap(b0, processingPartition_b0)));
     }
 
     @Test
@@ -833,8 +849,9 @@ public class ProcessingKafkaConsumerTest {
 
         //Simulate missed generation before we rejoin consumer group
         when(consumer.poll(any(Duration.class)))
-                .thenReturn(new ConsumerRecords<>(Collections.singletonMap(topicPartition, Arrays.asList(record3))));
-        when(consumer.committed(topicPartition)).thenReturn(new OffsetAndMetadata(record2.offset() + 1));
+                .thenReturn(new ConsumerRecords<>(singletonMap(topicPartition, Arrays.asList(record3))));
+        when(consumer.committed(singleton(topicPartition)))
+                .thenReturn(singletonMap(topicPartition, new OffsetAndMetadata(record2.offset() + 1)));
 
         // Rejoin consumer group during subsequent rebalance
         processingConsumer.rebalanceListener.onPartitionsAssigned(Arrays.asList(topicPartition,
@@ -893,7 +910,7 @@ public class ProcessingKafkaConsumerTest {
         processingConsumer.nextRecord(POLL_TIME); // record 2
 
         // record 1 should be committed
-        verify(consumer).commitSync(Collections.singletonMap(topicPartition,
+        verify(consumer).commitSync(singletonMap(topicPartition,
                 new OffsetAndMetadata(record1.offset() + 1)));
 
         assertThat(processingConsumer.getCommittableOffsets().isEmpty(), is(true));
@@ -930,7 +947,7 @@ public class ProcessingKafkaConsumerTest {
         processingConsumer.ack(topicPartition, record1.offset());
 
         // record 1 should be committed
-        verify(consumer).commitSync(Collections.singletonMap(topicPartition,
+        verify(consumer).commitSync(singletonMap(topicPartition,
                 new OffsetAndMetadata(record1.offset() + 1)));
 
         assertThat(processingConsumer.getCommittableOffsets().isEmpty(), is(true));
@@ -940,7 +957,7 @@ public class ProcessingKafkaConsumerTest {
         processingConsumer.ack(topicPartition, record3.offset());
 
         // These records should not be committed not enough time has passed
-        verify(consumer, never()).commitSync(Collections.singletonMap(topicPartition,
+        verify(consumer, never()).commitSync(singletonMap(topicPartition,
                 new OffsetAndMetadata(record3.offset() + 1)));
 
         // Up to record 3 should be eligible
@@ -967,7 +984,7 @@ public class ProcessingKafkaConsumerTest {
         processingConsumer.ack(topicPartition, record2.offset());
 
         // Verify the records were committed
-        verify(consumer).commitSync(Collections.singletonMap(topicPartition,
+        verify(consumer).commitSync(singletonMap(topicPartition,
                 new OffsetAndMetadata(record2.offset() + 1)));
 
         assertThat(processingConsumer.getCommittableOffsets().isEmpty(), is(true));
@@ -1040,7 +1057,7 @@ public class ProcessingKafkaConsumerTest {
         processingConsumer.ack(topicPartition, record2.offset());
 
         // Verify the records were committed
-        verify(consumer).commitSync(Collections.singletonMap(topicPartition,
+        verify(consumer).commitSync(singletonMap(topicPartition,
                 new OffsetAndMetadata(record2.offset() + 1)));
 
         assertThat(processingConsumer.getCommittableOffsets().isEmpty(), is(true));
@@ -1068,9 +1085,9 @@ public class ProcessingKafkaConsumerTest {
 
         // Read the first record in 3 separate batches or poll()'s
         when(consumer.poll(any(Duration.class))).thenReturn(
-                new ConsumerRecords<>(Collections.singletonMap(topicPartition, Arrays.asList(record1)))).thenReturn(
-                new ConsumerRecords<>(Collections.singletonMap(topicPartition, Arrays.asList(record1)))).thenReturn(
-                new ConsumerRecords<>(Collections.singletonMap(topicPartition, Arrays.asList(record1))));
+                new ConsumerRecords<>(singletonMap(topicPartition, Arrays.asList(record1)))).thenReturn(
+                new ConsumerRecords<>(singletonMap(topicPartition, Arrays.asList(record1)))).thenReturn(
+                new ConsumerRecords<>(singletonMap(topicPartition, Arrays.asList(record1))));
 
         // Read a message
         processingConsumer.nextRecord(POLL_TIME); // record 1 - batch 1
@@ -1113,10 +1130,10 @@ public class ProcessingKafkaConsumerTest {
 
         // Read the first record in 4 separate batches or poll()'s
         when(consumer.poll(any(Duration.class))).thenReturn(
-                new ConsumerRecords<>(Collections.singletonMap(topicPartition, Arrays.asList(record1)))).thenReturn(
-                new ConsumerRecords<>(Collections.singletonMap(topicPartition, Arrays.asList(record1)))).thenReturn(
-                new ConsumerRecords<>(Collections.singletonMap(topicPartition, Arrays.asList(record1)))).thenReturn(
-                new ConsumerRecords<>(Collections.singletonMap(topicPartition, Arrays.asList(record1))));
+                new ConsumerRecords<>(singletonMap(topicPartition, Arrays.asList(record1)))).thenReturn(
+                new ConsumerRecords<>(singletonMap(topicPartition, Arrays.asList(record1)))).thenReturn(
+                new ConsumerRecords<>(singletonMap(topicPartition, Arrays.asList(record1)))).thenReturn(
+                new ConsumerRecords<>(singletonMap(topicPartition, Arrays.asList(record1))));
 
         // Read a message
         processingConsumer.nextRecord(POLL_TIME); // record 1 - batch 1
@@ -1168,7 +1185,8 @@ public class ProcessingKafkaConsumerTest {
     public void rebalanceListener_onPartitionsAssigned() {
         long rebalanceCount = ProcessingKafkaConsumer.REBALANCE_COUNTER.count();
         TopicPartition newPartition = new TopicPartition("new-topic", 0);
-        when(consumer.committed(newPartition)).thenReturn(new OffsetAndMetadata(0L));
+        when(consumer.committed(singleton(newPartition)))
+                .thenReturn(singletonMap(newPartition, new OffsetAndMetadata(0L)));
         processingConsumer.rebalanceListener.onPartitionsAssigned(Arrays.asList(topicPartition, newPartition));
         assertThat(processingConsumer.partitions.keySet(), containsInAnyOrder(topicPartition, newPartition));
         assertThat(ProcessingKafkaConsumer.REBALANCE_COUNTER.count(), is(rebalanceCount + 1));
@@ -1282,13 +1300,13 @@ public class ProcessingKafkaConsumerTest {
     // Used to provide mock processing partition
     private class MockProcessingKafkaConsumer<K, V> extends ProcessingKafkaConsumer<K, V> {
 
-        protected MockProcessingKafkaConsumer(ProcessingConfig config, Consumer<K, V> consumer) {
+        protected MockProcessingKafkaConsumer(ProcessingConfig config, KafkaConsumer<K, V> consumer) {
             super(config, consumer);
         }
 
         @Override
         protected ProcessingPartition<K, V> buildPartition(TopicPartition topicPartition, ProcessingConfig processingConfig,
-                                                           Consumer<K, V> consumer) {
+                                                           KafkaConsumer<K, V> consumer) {
             return new MockProcessingPartition<>(topicPartition, processingConfig, consumer);
         }
     }

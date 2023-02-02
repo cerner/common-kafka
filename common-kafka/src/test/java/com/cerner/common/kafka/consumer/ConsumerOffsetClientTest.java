@@ -1,18 +1,18 @@
 package com.cerner.common.kafka.consumer;
 
-import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.clients.consumer.OffsetAndTimestamp;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -29,17 +29,18 @@ import static org.hamcrest.core.Is.is;
 import static org.hamcrest.core.IsCollectionContaining.hasItem;
 import static org.hamcrest.core.IsNot.not;
 import static org.hamcrest.core.IsNull.nullValue;
-import static org.junit.Assert.assertThat;
-import static org.mockito.Matchers.anyObject;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class ConsumerOffsetClientTest {
 
     @Mock
-    private Consumer<Object, Object> consumer;
+    private KafkaConsumer<Object, Object> consumer;
 
     @Captor
     private ArgumentCaptor<Map<TopicPartition, Long>> offsetsRequests;
@@ -52,7 +53,7 @@ public class ConsumerOffsetClientTest {
 
     private ConsumerOffsetClient client;
 
-    @Before
+    @BeforeEach
     public void before() {
         client = new ConsumerOffsetClient(consumer);
     }
@@ -68,9 +69,11 @@ public class ConsumerOffsetClientTest {
         assertThat(client.consumer, is(not(nullValue())));
     }
 
-    @Test (expected = IllegalArgumentException.class)
+    @Test
     public void constructor_propertiesNull() {
-        new ConsumerOffsetClient((Properties) null);
+        assertThrows(IllegalArgumentException.class,
+                () -> new ConsumerOffsetClient((Properties) null),
+                "Expected ConsumerOffsetClient constructor to throw IllegalArgumentException, but wasn't thrown");
     }
 
     @Test
@@ -80,9 +83,11 @@ public class ConsumerOffsetClientTest {
         assertThat(client.consumer, is(consumer));
     }
 
-    @Test (expected = IllegalArgumentException.class)
+    @Test
     public void constructor_consumerNull() {
-        new ConsumerOffsetClient((Consumer<Object, Object>) null);
+        assertThrows(IllegalArgumentException.class,
+                () -> new ConsumerOffsetClient((KafkaConsumer<Object, Object>) null),
+                "Expected ConsumerOffsetClient constructor to throw IllegalArgumentException, but wasn't thrown");
     }
 
     @Test
@@ -110,9 +115,11 @@ public class ConsumerOffsetClientTest {
         assertThat(client.getEndOffsets(Arrays.asList("topic1", "topic2")), is(offsets));
     }
 
-    @Test (expected = IllegalArgumentException.class)
+    @Test
     public void getEndOffsets_nullTopics() {
-        client.getEndOffsets(null);
+        assertThrows(IllegalArgumentException.class,
+                () -> client.getEndOffsets(null),
+                "Expected client.getEndOffsets to throw IllegalArgumentException, but wasn't thrown");
     }
 
     @Test
@@ -140,9 +147,11 @@ public class ConsumerOffsetClientTest {
         assertThat(client.getEndOffsets(Arrays.asList("topic1", "topic2")), is(offsets));
     }
 
-    @Test (expected = IllegalArgumentException.class)
+    @Test
     public void getBeginningOffsets_nullTopics() {
-        client.getBeginningOffsets(null);
+        assertThrows(IllegalArgumentException.class,
+                () -> client.getBeginningOffsets(null),
+                "Expected client.getBeginningOffsets to throw IllegalArgumentException, but wasn't thrown");
     }
 
     @Test
@@ -160,20 +169,28 @@ public class ConsumerOffsetClientTest {
                 new PartitionInfo("topic2", 0, null, null, null),
                 new PartitionInfo("topic2", 1, null, null, null)));
 
-        when(consumer.committed(new TopicPartition("topic1", 0))).thenReturn(new OffsetAndMetadata(123L));
-        when(consumer.committed(new TopicPartition("topic1", 1))).thenReturn(new OffsetAndMetadata(234L));
+        TopicPartition topic0 = new TopicPartition("topic1", 0);
+        when(consumer.committed(Collections.singleton(topic0)))
+                .thenReturn(Collections.singletonMap(topic0, new OffsetAndMetadata(123L)));
+        TopicPartition topic1 = new TopicPartition("topic1", 1);
+        when(consumer.committed(Collections.singleton(topic1)))
+                .thenReturn(Collections.singletonMap(topic1, new OffsetAndMetadata(234L)));
 
         assertThat(client.getCommittedOffsets(Arrays.asList("topic1", "topic2")), is(offsets));
     }
 
-    @Test (expected = IllegalArgumentException.class)
+    @Test
     public void getCommittedOffsets_nullTopics() {
-        client.getCommittedOffsets(null);
+        assertThrows(IllegalArgumentException.class,
+                () -> client.getCommittedOffsets(null),
+                "Expected client.getCommittedOffsets to throw IllegalArgumentException, but wasn't thrown");
     }
 
     @Test
     public void getCommittedOffset() {
-        when(consumer.committed(new TopicPartition("topic", 0))).thenReturn(new OffsetAndMetadata(123L));
+        TopicPartition topic = new TopicPartition("topic", 0);
+        when(consumer.committed(Collections.singleton(topic)))
+                .thenReturn(Collections.singletonMap(topic, new OffsetAndMetadata(123L)));
         assertThat(client.getCommittedOffset(new TopicPartition("topic", 0)), is(123L));
     }
 
@@ -182,14 +199,18 @@ public class ConsumerOffsetClientTest {
         assertThat(client.getCommittedOffset(new TopicPartition("topic", 0)), is(-1L));
     }
 
-    @Test (expected = IllegalArgumentException.class)
+    @Test
     public void getCommittedOffset_nullTopicPartition() {
-        client.getCommittedOffset(null);
+        assertThrows(IllegalArgumentException.class,
+                () -> client.getCommittedOffset(null),
+                "Expected client.getCommittedOffsets to throw IllegalArgumentException, but wasn't thrown");
     }
 
-    @Test (expected = IllegalArgumentException.class)
+    @Test
     public void getOffsetForTimes_nullTopics() {
-        client.getOffsetsForTimes(null,1);
+        assertThrows(IllegalArgumentException.class,
+                () -> client.getOffsetsForTimes(null,1),
+                "Expected client.getOffsetsForTime to throw IllegalArgumentException, but wasn't thrown");
     }
 
     @Test
@@ -210,13 +231,13 @@ public class ConsumerOffsetClientTest {
                 new PartitionInfo("topic2", 0, null, null, null),
                 new PartitionInfo("topic2", 1, null, null, null)));
 
-        when(consumer.offsetsForTimes(anyObject())).thenReturn(offsets);
+        when(consumer.offsetsForTimes(any())).thenReturn(offsets);
 
         long time = 10L;
         assertThat(client.getOffsetsForTimes(Arrays.asList("topic1", "topic2"), time), is(longOffsets));
 
         //all were found so no need to look up any ending offsets
-        verify(consumer, never()).endOffsets(anyObject());
+        verify(consumer, never()).endOffsets(any());
 
         verify(consumer).offsetsForTimes(offsetsRequests.capture());
 
@@ -241,12 +262,12 @@ public class ConsumerOffsetClientTest {
                 new PartitionInfo("topic1", 0, null, null, null),
                 new PartitionInfo("topic1", 1, null, null, null)));
 
-        when(consumer.offsetsForTimes(anyObject())).thenReturn(offsets);
+        when(consumer.offsetsForTimes(any())).thenReturn(offsets);
 
         Map<TopicPartition, Long> missingOffsets = new HashMap<>();
         missingOffsets.put(new TopicPartition("topic1", 0), 234L);
 
-        when(consumer.endOffsets(anyObject())).thenReturn(missingOffsets);
+        when(consumer.endOffsets(any())).thenReturn(missingOffsets);
 
         Map<TopicPartition, Long> longOffsets = new HashMap<>();
         longOffsets.put(new TopicPartition("topic1", 0), 234L);
@@ -296,8 +317,8 @@ public class ConsumerOffsetClientTest {
                 new PartitionInfo("topic2", 0, null, null, null),
                 new PartitionInfo("topic2", 1, null, null, null)));
 
-        when(consumer.offsetsForTimes(anyObject())).thenReturn(offsetsInRange);
-        when(consumer.endOffsets(anyObject())).thenReturn(longOffsetsInRange);
+        when(consumer.offsetsForTimes(any())).thenReturn(offsetsInRange);
+        when(consumer.endOffsets(any())).thenReturn(longOffsetsInRange);
 
         long time = 10L;
         assertThat(client.getOffsetsForTimes(Arrays.asList("topic1", "topic2"), time), is(longOffsetsInRange));
@@ -321,9 +342,12 @@ public class ConsumerOffsetClientTest {
         assertThat(endingValue, hasItem(new TopicPartition("topic2", 0)));
     }
 
-    @Test(expected=IllegalArgumentException.class)
+    @Test
     public void commitOffsets_null() {
-        client.commitOffsets(null);
+        assertThrows(IllegalArgumentException.class,
+                () -> client.commitOffsets(null),
+                "Expected client.commitOffsets to throw IllegalArgumentException, but wasn't thrown");
+
     }
 
     @Test
@@ -342,14 +366,18 @@ public class ConsumerOffsetClientTest {
         request.forEach((k, v) -> assertThat(v.offset(), is(offsets.get(k))));
     }
 
-    @Test(expected=IllegalArgumentException.class)
+    @Test
     public void commitOffsets_negativeValue(){
-        client.commitOffsets(Collections.singletonMap(new TopicPartition("topic1", 0), -1L));
+        assertThrows(IllegalArgumentException.class,
+                () -> client.commitOffsets(Collections.singletonMap(new TopicPartition("topic1", 0), -1L)),
+                "Expected client.commitOffsets to throw IllegalArgumentException, but wasn't thrown");
     }
 
-    @Test(expected=NullPointerException.class)
+    @Test
     public void commitOffsets_nullValue(){
-        client.commitOffsets(Collections.singletonMap(new TopicPartition("topic1", 0), null));
+        assertThrows(NullPointerException.class,
+                () -> client.commitOffsets(Collections.singletonMap(new TopicPartition("topic1", 0), null)),
+                "Expected client.commitOffsets to throw NullPointerException, but wasn't thrown");
     }
 
     @Test
@@ -369,9 +397,12 @@ public class ConsumerOffsetClientTest {
         )));
     }
 
-    @Test (expected = IllegalArgumentException.class)
+    @Test
     public void getPartitionsFor_nullTopics() {
-        client.getPartitionsFor(null);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> client.getPartitionsFor(null),
+                "Expected client.getPartitionsFor to throw IllegalArgumentException, but wasn't thrown");
     }
 
     @Test

@@ -3,10 +3,9 @@ package com.cerner.common.kafka.producer.partitioners;
 import org.apache.kafka.common.Cluster;
 import org.apache.kafka.common.Node;
 import org.apache.kafka.common.PartitionInfo;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.TestInfo;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -18,12 +17,9 @@ import java.util.stream.IntStream;
 import static org.hamcrest.core.Is.is;
 import static org.hamcrest.number.OrderingComparison.greaterThanOrEqualTo;
 import static org.hamcrest.number.OrderingComparison.lessThan;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.MatcherAssert.assertThat;
 
 public class FairPartitionerTest {
-
-    @Rule
-    public TestName testName = new TestName();
 
     private FairPartitioner partitioner;
     private String topic;
@@ -36,10 +32,10 @@ public class FairPartitionerTest {
     private List<PartitionInfo> notAvailablePartitions;
     private Node node;
 
-    @Before
-    public void setup() throws InterruptedException {
+    @BeforeEach
+    public void setup(TestInfo testInfo) throws InterruptedException {
         partitioner = new FairPartitioner();
-        topic = testName.getMethodName();
+        topic = testInfo.getDisplayName();
         key = new Object();
         keyBytes = new byte[0];
         value = new Object();
