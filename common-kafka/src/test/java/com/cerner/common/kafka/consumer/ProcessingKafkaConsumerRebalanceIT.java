@@ -27,7 +27,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -40,6 +39,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.core.Is.is;
@@ -542,8 +542,7 @@ public class ProcessingKafkaConsumerRebalanceIT {
         private void initializeConsumer() {
             consumer = new CommitTrackingProcessingKafkaConsumer<>(config);
             consumerId = consumer.toString(); // generate a unique id
-            List<String> topicNames = new ArrayList<>();
-            topics.forEach(t -> topicNames.add(t.name()));
+            List<String> topicNames = topics.stream().map(NewTopic::name).collect(Collectors.toList());
             consumer.subscribe(topicNames);
         }
 
