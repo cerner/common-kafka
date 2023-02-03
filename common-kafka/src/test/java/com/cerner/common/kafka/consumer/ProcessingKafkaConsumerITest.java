@@ -98,7 +98,7 @@ public class ProcessingKafkaConsumerITest {
 
     @BeforeEach
     public void setTestName(TestInfo testInfo){
-        testName = testInfo.getDisplayName().replaceAll("[^a-zA-Z0-9]", "-");
+        testName = testInfo.getDisplayName().replaceAll("[^a-zA-Z0-9]", "-").trim();
     }
 
     @Test

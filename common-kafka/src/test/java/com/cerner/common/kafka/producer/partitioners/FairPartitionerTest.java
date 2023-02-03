@@ -35,7 +35,7 @@ public class FairPartitionerTest {
     @BeforeEach
     public void setup(TestInfo testInfo) throws InterruptedException {
         partitioner = new FairPartitioner();
-        topic = testInfo.getDisplayName();
+        topic = testInfo.getDisplayName().replaceAll("[^a-zA-Z0-9]", "-").trim();
         key = new Object();
         keyBytes = new byte[0];
         value = new Object();

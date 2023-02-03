@@ -89,7 +89,7 @@ public class ProcessingKafkaConsumerRebalanceIT {
 
     @BeforeEach
     public void setTestName(TestInfo testInfo){
-        name = testInfo.getDisplayName();
+        name = testInfo.getDisplayName().replaceAll("[^a-zA-Z0-9]", "-").trim();
     }
 
     @AfterAll
