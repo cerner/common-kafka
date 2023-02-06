@@ -1,7 +1,7 @@
 package com.cerner.common.kafka.consumer;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.clients.consumer.OffsetAndTimestamp;
 import org.apache.kafka.common.PartitionInfo;
@@ -40,7 +40,7 @@ import static org.mockito.Mockito.when;
 public class ConsumerOffsetClientTest {
 
     @Mock
-    private KafkaConsumer<Object, Object> consumer;
+    private Consumer<Object, Object> consumer;
 
     @Captor
     private ArgumentCaptor<Map<TopicPartition, Long>> offsetsRequests;
@@ -86,7 +86,7 @@ public class ConsumerOffsetClientTest {
     @Test
     public void constructor_consumerNull() {
         assertThrows(IllegalArgumentException.class,
-                () -> new ConsumerOffsetClient((KafkaConsumer<Object, Object>) null),
+                () -> new ConsumerOffsetClient((Consumer<Object, Object>) null),
                 "Expected ConsumerOffsetClient constructor to throw IllegalArgumentException, but wasn't thrown");
     }
 

@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.clients.consumer.OffsetResetStrategy;
 import org.apache.kafka.common.KafkaException;
@@ -51,7 +51,7 @@ public class ProcessingPartitionTest {
     private TestLogAppender logAppender;
 
     @Mock
-    KafkaConsumer<String, String> consumer;
+    Consumer<String, String> consumer;
 
     Properties properties;
     ProcessingConfig config;
@@ -650,7 +650,7 @@ public class ProcessingPartitionTest {
         public Long earliestBrokerOffset;
         public Long latestBrokerOffset;
 
-        public MockProcessingPartition(TopicPartition topicPartition, ProcessingConfig config, KafkaConsumer<K, V> consumer) {
+        public MockProcessingPartition(TopicPartition topicPartition, ProcessingConfig config, Consumer<K, V> consumer) {
             super(topicPartition, config, consumer);
         }
 

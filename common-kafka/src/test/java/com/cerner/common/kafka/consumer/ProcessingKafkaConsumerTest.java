@@ -40,7 +40,7 @@ import java.util.stream.Collectors;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.clients.consumer.OffsetResetStrategy;
 import org.apache.kafka.common.TopicPartition;
@@ -61,7 +61,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 public class ProcessingKafkaConsumerTest {
 
     @Mock
-    KafkaConsumer<String, String> consumer;
+    Consumer<String, String> consumer;
     @Captor
     ArgumentCaptor<Map<TopicPartition, OffsetAndMetadata>> commitCaptor;
 
@@ -140,7 +140,7 @@ public class ProcessingKafkaConsumerTest {
         properties.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         properties.put(ConsumerConfig.GROUP_ID_CONFIG, "group");
 
-        // KafkaConsumer is very picky and wants this to be lower case. This is also need by the processing consumer
+        // Consumer is very picky and wants this to be lower case. This is also need by the processing consumer
         properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, OffsetResetStrategy.EARLIEST.toString().toLowerCase());
 
         // Build the consumer
@@ -164,7 +164,7 @@ public class ProcessingKafkaConsumerTest {
     @Test
     public void constructorWithoutConsumer() throws IOException {
         try (ProcessingKafkaConsumer<String, String> processingKafkaConsumer = new ProcessingKafkaConsumer<>(config)) {
-            assertThat(processingKafkaConsumer.getConsumer(), is(instanceOf(KafkaConsumer.class)));
+            assertThat(processingKafkaConsumer.getConsumer(), is(instanceOf(Consumer.class)));
         }
     }
 
@@ -194,7 +194,7 @@ public class ProcessingKafkaConsumerTest {
         Deserializer<String> valueDeserializer = new StringDeserializer();
         try (ProcessingKafkaConsumer<String, String> processingKafkaConsumer =
                  new ProcessingKafkaConsumer<>(config, keyDeserializer, valueDeserializer)) {
-            assertThat(processingKafkaConsumer.getConsumer(), is(instanceOf(KafkaConsumer.class)));
+            assertThat(processingKafkaConsumer.getConsumer(), is(instanceOf(Consumer.class)));
         }
     }
 
@@ -1309,13 +1309,13 @@ public class ProcessingKafkaConsumerTest {
     // Used to provide mock processing partition
     private class MockProcessingKafkaConsumer<K, V> extends ProcessingKafkaConsumer<K, V> {
 
-        protected MockProcessingKafkaConsumer(ProcessingConfig config, KafkaConsumer<K, V> consumer) {
+        protected MockProcessingKafkaConsumer(ProcessingConfig config, Consumer<K, V> consumer) {
             super(config, consumer);
         }
 
         @Override
         protected ProcessingPartition<K, V> buildPartition(TopicPartition topicPartition, ProcessingConfig processingConfig,
-                                                           KafkaConsumer<K, V> consumer) {
+                                                           Consumer<K, V> consumer) {
             return new MockProcessingPartition<>(topicPartition, processingConfig, consumer);
         }
     }

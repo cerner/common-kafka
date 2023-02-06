@@ -4,7 +4,7 @@ import com.yammer.metrics.Metrics;
 import com.yammer.metrics.core.Counter;
 import com.yammer.metrics.core.Histogram;
 import com.yammer.metrics.core.Meter;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.clients.consumer.OffsetResetStrategy;
@@ -79,7 +79,7 @@ public class ProcessingPartition<K, V> implements Closeable {
     /**
      * The consumer for this partition
      */
-    private final KafkaConsumer<K, V> consumer;
+    private final Consumer<K, V> consumer;
 
     /**
      * The set of offsets that have been {@link #nextRecord() read} but not {@link #ack(long) acked}
@@ -143,7 +143,7 @@ public class ProcessingPartition<K, V> implements Closeable {
      * @throws IllegalStateException
      *          if the processing partition could not be properly initialized
      */
-    public ProcessingPartition(TopicPartition topicPartition, ProcessingConfig config, KafkaConsumer<K, V> consumer) {
+    public ProcessingPartition(TopicPartition topicPartition, ProcessingConfig config, Consumer<K, V> consumer) {
         this.topicPartition = topicPartition;
         this.config = config;
         this.consumer = consumer;

@@ -140,7 +140,7 @@ public class ProcessingKafkaConsumer<K, V> implements Closeable {
     /**
      * The Kafka consumer used to read messages from
      */
-    protected final KafkaConsumer<K, V> consumer;
+    protected final Consumer<K, V> consumer;
 
     /**
      * The config provided for this consumer
@@ -235,7 +235,7 @@ public class ProcessingKafkaConsumer<K, V> implements Closeable {
      * @param consumer the Kafka consumer used to read messages
      * @throws IllegalArgumentException if config or consumer is {@code null}
      */
-    ProcessingKafkaConsumer(ProcessingConfig config, KafkaConsumer<K, V> consumer) {
+    ProcessingKafkaConsumer(ProcessingConfig config, Consumer<K, V> consumer) {
         if (config == null)
             throw new IllegalArgumentException("config cannot be null");
         if (consumer == null)
@@ -664,7 +664,7 @@ public class ProcessingKafkaConsumer<K, V> implements Closeable {
 
     // Used for unit testing
     protected ProcessingPartition<K, V> buildPartition(TopicPartition topicPartition, ProcessingConfig processingConfig,
-                                                       KafkaConsumer<K, V> consumer) {
+                                                       Consumer<K, V> consumer) {
         return new ProcessingPartition<>(topicPartition, processingConfig, consumer);
     }
 
