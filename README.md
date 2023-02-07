@@ -10,19 +10,19 @@ For Maven, add the following,
 <dependency>
     <groupId>com.cerner.common.kafka</groupId>
     <artifactId>common-kafka</artifactId>
-    <version>2.0</version>
+    <version>3.0</version>
 </dependency>
 <!-- For connect utilities -->
 <dependency>
     <groupId>com.cerner.common.kafka</groupId>
     <artifactId>common-kafka-connect</artifactId>
-    <version>2.0</version>
+    <version>3.0</version>
 </dependency>
 <!-- For test utilities -->
 <dependency>
     <groupId>com.cerner.common.kafka</groupId>
     <artifactId>common-kafka-test</artifactId>
-    <version>2.0</version>
+    <version>3.0</version>
 </dependency>
 ```
 
