@@ -113,7 +113,9 @@ public class KafkaBrokerTestHarness extends QuorumTestHarness {
     /**
      * Creates a new Kafka broker test harness using the given broker configuration properties and Zookeeper port.
      *
+     * @param numOfBrokers the number of brokers to configure.
      * @param clusterId the Kafka cluster id.
+     * @param properties properties to be used when initializing the KafkaServer objects (brokers).
      *
      */
     public KafkaBrokerTestHarness(final int numOfBrokers, final String clusterId, final Properties properties) {
@@ -138,8 +140,11 @@ public class KafkaBrokerTestHarness extends QuorumTestHarness {
 
     /**
      * Start up the Kafka broker cluster.
+     * @param testInfo test info object passed along to {@link QuorumTestHarness} setup method. Used to determine if
+     *                 the test will run with zookeeper or Kraft.  If the testinof.displayName() contains "quorum=kraft"
+     *                 it will run in Kraft mode, if it contains "quorum=zk" it will run in zookeeper mode.
+     *                 If the displayName contains neither it will also run in zk mode.
      *
-     * @throws IOException if an error occurs during Kafka broker startup.
      * @throws IllegalStateException if the Kafka broker cluster has already been {@link #setUp(TestInfo) setup}.
      */
     @Override
@@ -162,7 +167,6 @@ public class KafkaBrokerTestHarness extends QuorumTestHarness {
      *
      * @throws IllegalStateException if the Kafka broker cluster has already been {@link #tearDown() torn down} or has not been
      *      {@link #setUp(TestInfo)}.
-     * @throws IOException if an error occurs during Kafka broker shutdown.
      */
     @Override
     public void tearDown() {
