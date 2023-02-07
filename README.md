@@ -31,8 +31,8 @@ For Maven, add the following,
 The following modules are available for use,
 
 * [common-kafka](common-kafka/README.md): Lightweight wrapper for
-[producers](http://kafka.apache.org/0102/javadoc/org/apache/kafka/clients/producer/KafkaProducer.html)
-and [consumers](http://kafka.apache.org/0102/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html)
+[producers](http://kafka.apache.org/32/javadoc/org/apache/kafka/clients/producer/KafkaProducer.html)
+and [consumers](http://kafka.apache.org/32/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html)
 in the [kafka-clients](https://github.com/apache/kafka/tree/trunk/clients) library.
 * [common-kafka-connect](common-kafka-connect/README.md): Contains
 [Kafka Connect](http://kafka.apache.org/documentation.html#connect) component implementations.
