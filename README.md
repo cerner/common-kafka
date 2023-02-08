@@ -43,13 +43,19 @@ Please refer to the project-specific README documentation for content details.
 
 ## Version Requirements
 
-The 2.0 release of common-kafka uses the following dependency versions.
+The 3.0 release of common-kafka uses the following dependency versions.
 
 * [Kafka](http://kafka.apache.org/): 3.2.0
 * [Metrics](http://metrics.dropwizard.io/): 2.2.0
 * [Scala](https://scala-lang.org/): 2.13.5
 
 Note that the Scala dependency is only applicable for common-kafka-test.
+
+## Upgrading from common-kafka 2.x to 3.0
+
+* The common-kafka-admin module has been removed, KafkaAdminClient can be replaced by Kafka's [admin client](https://github.com/apache/kafka/blob/3.2.0/clients/src/main/java/org/apache/kafka/clients/admin/AdminClient.java)
+* KafkaBrokerTestHarness has been updated to require TestInfo in the setup method, which requires junit5.
+ By extending AbstractKafkaTests instead of using KafkaBrokerTestHarness directly you can avoid needing to add a junit5 dependency.
 
 ## Contribute
 
