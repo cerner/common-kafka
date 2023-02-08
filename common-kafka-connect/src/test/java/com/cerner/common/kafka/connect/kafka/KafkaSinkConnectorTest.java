@@ -1,15 +1,15 @@
 package com.cerner.common.kafka.connect.kafka;
 
 import org.apache.kafka.clients.producer.ProducerConfig;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
 import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.MatcherAssert.assertThat;
 
 public class KafkaSinkConnectorTest {
 
@@ -17,7 +17,7 @@ public class KafkaSinkConnectorTest {
     private Map<String, String> taskConfig;
     private KafkaSinkConnector connector;
 
-    @Before
+    @BeforeEach
     public void before() {
         connector = new KafkaSinkConnector();
 

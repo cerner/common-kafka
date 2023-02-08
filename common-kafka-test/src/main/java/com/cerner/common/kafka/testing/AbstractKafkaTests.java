@@ -1,11 +1,9 @@
 package com.cerner.common.kafka.testing;
 
-import kafka.utils.ZkUtils;
-import org.I0Itec.zkclient.ZkClient;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.ClassRule;
-import org.junit.rules.Timeout;
+import kafka.utils.EmptyTestInfo;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import java.util.Properties;
@@ -59,21 +57,19 @@ import java.util.Properties;
  *
  * @author Brandon Inman
  */
+@Timeout(600)
 public abstract class AbstractKafkaTests {
 
     private static KafkaBrokerTestHarness kafka = null;
     private static boolean runAsSuite = false;
 
-    @ClassRule
-    public static final Timeout TIMEOUT = Timeout.millis(600_000); //10 minutes
-
-    @BeforeClass
+    @BeforeAll
     public static void startSuite() throws IOException {
         runAsSuite = true;
         startKafka();
     }
 
-    @AfterClass
+    @AfterAll
     public static void endSuite() throws IOException {
         stopKafka();
     }
@@ -99,9 +95,8 @@ public abstract class AbstractKafkaTests {
     }
 
     public static void startKafka(Properties props) throws IOException {
-        int zookeeperPort = KafkaTestUtils.getPorts(1)[0];
-        kafka = new KafkaBrokerTestHarness(KafkaBrokerTestHarness.getBrokerConfig(1, zookeeperPort, props), zookeeperPort, "kafka");
-        kafka.setUp();
+        kafka = new KafkaBrokerTestHarness(1,"kafka", props);
+        kafka.setUp(new EmptyTestInfo());
     }
 
     public static void stopKafka() throws IOException {
@@ -120,13 +115,5 @@ public abstract class AbstractKafkaTests {
 
     public static Properties getProps() {
         return (kafka != null) ? kafka.getProps() : null;
-    }
-
-    public static ZkClient getZkClient() {
-        return (kafka != null) ? kafka.getZkClient() : null;
-    }
-
-    public static ZkUtils getZkUtils() {
-        return (kafka != null) ? kafka.getZkUtils() : null;
     }
 }

@@ -16,11 +16,3 @@ The primary classes available for use are listed below.
 ### [AbstractKafkaTests](src/main/java/com/cerner/common/kafka/testing/AbstractKafkaTests.java)
 
 * Provides a simple framework for coordinating the `KafkaBrokerTestHarness` with a suite of unit tests.
-
-## ZooKeeper
-
-### [ZookeeperTestHarness](src/main/java/com/cerner/common/kafka/testing/ZookeeperTestHarness.java)
-
-* Runs a standalone ZooKeeper service within the process.
-* Creates a `ZkClient` for conveniently interacting with the service.
-* Cleans up data on service shutdown.

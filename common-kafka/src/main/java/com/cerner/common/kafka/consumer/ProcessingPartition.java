@@ -334,7 +334,7 @@ public class ProcessingPartition<K, V> implements Closeable {
     protected long getLastCommittedOffset() {
         OffsetAndMetadata lastCommittedOffset;
         try {
-            lastCommittedOffset = consumer.committed(topicPartition);
+            lastCommittedOffset = consumer.committed(Collections.singleton(topicPartition)).get(topicPartition);
         } catch (KafkaException e) {
             throw new IllegalStateException("Unable to retrieve committed offset for topic partition [" + topicPartition + "]", e);
         }

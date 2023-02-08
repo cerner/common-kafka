@@ -7,9 +7,11 @@
 * Brian Tieman
 * Stephen Durfey
 * Greg Whitsitt
+* Matt Garlock [@matt-garlock][matt-garlock]
 
 [bryan-baugher]: https://github.com/bbaugher
 [andrew-olson]: https://github.com/noslowerdna
 [cole-skoviak]: https://github.com/EdwardSkoviak
 [micah-whitacre]: https://github.com/mkwhitacre
 [pooja-dhondge]: https://github.com/dhondgepooja
+[matt-garlock]: https://github.com/matt-garlock

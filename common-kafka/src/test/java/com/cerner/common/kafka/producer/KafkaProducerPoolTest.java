@@ -2,19 +2,21 @@ package com.cerner.common.kafka.producer;
 
 import com.cerner.common.kafka.consumer.ConsumerOffsetClient;
 
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringSerializer;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import com.cerner.common.kafka.KafkaExecutionException;
 import com.cerner.common.kafka.KafkaTests;
-import com.cerner.common.kafka.admin.KafkaAdminClient;
 import com.cerner.common.kafka.testing.KafkaTestUtils;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -38,11 +40,11 @@ import java.util.concurrent.Future;
 import static com.cerner.common.kafka.producer.KafkaProducerPool.DEFAULT_KAFKA_PRODUCER_CONCURRENCY_INT;
 import static com.cerner.common.kafka.producer.KafkaProducerPool.KAFKA_PRODUCER_CONCURRENCY;
 import static org.apache.kafka.clients.producer.ProducerConfig.LINGER_MS_CONFIG;
-import static org.apache.kafka.clients.producer.ProducerConfig.RETRY_BACKOFF_MS_CONFIG;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.not;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -56,35 +58,36 @@ import static org.apache.kafka.clients.producer.ProducerConfig.ACKS_CONFIG;
 public class KafkaProducerPoolTest {
 
     private KafkaProducerPool<String, String> pool;
-    private static KafkaAdminClient kafkaAdminClient;
+    private static AdminClient kafkaAdminClient;
 
     private static final String FORCE_PRODUCER_ROTATION_OVERFLOW = "producer.rotation.overflow";
 
-    @BeforeClass
+    @BeforeAll
     public static void startup() throws Exception {
         KafkaTests.startTest();
-        kafkaAdminClient = new KafkaAdminClient(KafkaTests.getProps());
+        kafkaAdminClient = AdminClient.create(KafkaTests.getProps());
     }
 
-    @AfterClass
+    @AfterAll
     public static void shutdown() throws Exception {
         kafkaAdminClient.close();
         KafkaTests.endTest();
     }
 
-    @Before
+    @BeforeEach
     public void initializePool() {
         pool = new KafkaProducerPool<>();
     }
 
-    @After
+    @AfterEach
     public void closePool() throws IOException {
         pool.close();
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void nullProperties() {
-        pool.getProducer(null);
+        assertThrows(IllegalArgumentException.class, () -> pool.getProducer(null),
+                "Expected pool.getProdcuer to throw illegal argument exception, but it wasn't thrown.");
     }
 
     @Test
@@ -212,7 +215,8 @@ public class KafkaProducerPoolTest {
         producers.forEach(producer -> verify(producer, times(1)).close());
     }
 
-    @Test (timeout = 10000)
+    @Test
+    @Timeout(10)
     public void messageProductionWithProducerConfig() throws InterruptedException, KafkaExecutionException, ExecutionException {
         Properties props = KafkaTests.getProps();
         props.setProperty(KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
@@ -222,7 +226,8 @@ public class KafkaProducerPoolTest {
         messageProduction(props);
     }
 
-    @Test (timeout = 10000)
+    @Test
+    @Timeout(10)
     public void messageProductionWithProperties() throws InterruptedException, KafkaExecutionException, ExecutionException {
         Properties props = KafkaTests.getProps();
         props.setProperty(KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
@@ -243,20 +248,23 @@ public class KafkaProducerPoolTest {
     }
 
     private void messageProduction(Properties config) throws InterruptedException, KafkaExecutionException, ExecutionException {
-        String topic = "topic_" + UUID.randomUUID().toString();
+        String topicName = "topic_" + UUID.randomUUID().toString();
+        NewTopic topic = new NewTopic(topicName, 4, (short) 1);
+        Set<NewTopic> topics = new HashSet<>();
+        topics.add(topic);
 
-        kafkaAdminClient.createTopic(topic, 4, 1, new Properties());
+        kafkaAdminClient.createTopics(topics);
 
         Producer<String, String> producer = pool.getProducer(config);
 
         long messages = 10;
         for (long i = 0; i < messages; ++i) {
-            producer.send(new ProducerRecord<>(topic, String.valueOf(i), UUID.randomUUID().toString())).get();
+            producer.send(new ProducerRecord<>(topicName, String.valueOf(i), UUID.randomUUID().toString())).get();
         }
 
         // We loop here since the producer doesn't necessarily write to ZK immediately after receiving a write
         ConsumerOffsetClient consumerOffsetClient = new ConsumerOffsetClient(config);
-        while(KafkaTestUtils.getTopicAndPartitionOffsetSum(topic, consumerOffsetClient.getEndOffsets(Arrays.asList(topic))) != messages)
+        while(KafkaTestUtils.getTopicAndPartitionOffsetSum(topicName, consumerOffsetClient.getEndOffsets(Arrays.asList(topicName))) != messages)
             Thread.sleep(100);
     }
 

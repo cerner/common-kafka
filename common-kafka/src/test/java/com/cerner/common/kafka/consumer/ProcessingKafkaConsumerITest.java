@@ -1,11 +1,11 @@
 package com.cerner.common.kafka.consumer;
 
 import com.cerner.common.kafka.KafkaTests;
-import com.cerner.common.kafka.admin.KafkaAdminClient;
-import com.cerner.common.kafka.consumer.ProcessingConfig;
 
 import com.cerner.common.kafka.consumer.assignors.FairAssignor;
 import org.apache.commons.io.IOUtils;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -18,11 +18,11 @@ import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestName;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,7 +44,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.hamcrest.core.Is.is;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.MatcherAssert.assertThat;
 
 // Integration testing of ProcessingKafkaConsumer client
 public class ProcessingKafkaConsumerITest {
@@ -66,15 +66,18 @@ public class ProcessingKafkaConsumerITest {
 
     private static Properties CONSUMER_PROPERTIES = new Properties();
 
-    private static KafkaAdminClient kafkaAdminClient;
+    private static AdminClient kafkaAdminClient;
+    private String testName;
 
-    @Rule
-    public TestName name = new TestName();
-
-    @BeforeClass
+    @BeforeAll
     public static void startup() throws Exception {
         KafkaTests.startTest();
-        kafkaAdminClient = new KafkaAdminClient(KafkaTests.getProps());
+        Properties kafkaTestProps = KafkaTests.getProps();
+        if (kafkaTestProps == null) {
+            throw new RuntimeException("KafkaTests.getProps() returned null");
+        }
+
+        kafkaAdminClient = AdminClient.create(kafkaTestProps);
 
         CONSUMER_PROPERTIES.putAll(KafkaTests.getProps());
         CONSUMER_PROPERTIES.setProperty(ConsumerConfig.PARTITION_ASSIGNMENT_STRATEGY_CONFIG, FairAssignor.class.getName());
@@ -87,10 +90,15 @@ public class ProcessingKafkaConsumerITest {
         CONSUMER_PROPERTIES.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
     }
 
-    @AfterClass
+    @AfterAll
     public static void shutdown() throws Exception {
         kafkaAdminClient.close();
         KafkaTests.endTest();
+    }
+
+    @BeforeEach
+    public void setTestName(TestInfo testInfo){
+        testName = testInfo.getDisplayName().replaceAll("[^a-zA-Z0-9]", "-").trim();
     }
 
     @Test
@@ -109,26 +117,27 @@ public class ProcessingKafkaConsumerITest {
         AtomicBoolean finishedProcessing = new AtomicBoolean(false);
         Map<RecordId, List<ConsumerAction>> recordHistory = new ConcurrentHashMap<>();
 
-        Set<String> topicList = new HashSet<>();
+        Set<NewTopic> topicList = new HashSet<>();
+        Set<String> topicNames = new HashSet<>();
 
         for(int i=0; i<TOPICS; i++) {
-            String topic = "topic-" + i + name.getMethodName();
-            topicList.add(topic);
-
+            String topicName = "topic-" + i + testName;
             // Only 1 replica since our testing only has 1 broker
-            kafkaAdminClient.createTopic(topic, PARTITIONS, 1, new Properties());
+            topicNames.add(topicName);
+            topicList.add(new NewTopic(topicName, PARTITIONS, (short) 1));
         }
+        kafkaAdminClient.createTopics(topicList);
 
         // Setup consumer threads
         Properties consumerProperties = new Properties();
         consumerProperties.putAll(CONSUMER_PROPERTIES);
-        consumerProperties.setProperty(ConsumerConfig.GROUP_ID_CONFIG, "processing-group-" + name.getMethodName());
+        consumerProperties.setProperty(ConsumerConfig.GROUP_ID_CONFIG, "processing-group-" + testName);
 
         ProcessingConfig config = new ProcessingConfig(consumerProperties);
 
         List<ConsumerThread> threads = new ArrayList<>();
         for(int i=0; i<CONSUMERS; i++) {
-            ConsumerThread thread = new ConsumerThread("consumer" + i, config, topicList, shutdownConsumers,
+            ConsumerThread thread = new ConsumerThread("consumer" + i, config, topicNames, shutdownConsumers,
                     recordHistory, finishedProcessing);
             threads.add(thread);
         }
@@ -142,7 +151,7 @@ public class ProcessingKafkaConsumerITest {
         Producer<String, String> producer = new KafkaProducer<String, String>(producerProperties);
 
         int writtenRecords = 0;
-        for(String topic : topicList) {
+        for(String topic : topicNames) {
             for(int message=0; message < MESSAGES_PER_TOPIC; message++) {
 
                 int partition = message % PARTITIONS;
