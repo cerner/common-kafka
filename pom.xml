@@ -94,11 +94,6 @@
     <dependencies>
       <dependency>
         <groupId>com.cerner.common.kafka</groupId>
-        <artifactId>common-kafka-admin</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.cerner.common.kafka</groupId>
         <artifactId>common-kafka</artifactId>
         <version>${project.version}</version>
       </dependency>
