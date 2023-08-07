@@ -40,6 +40,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.hamcrest.core.Is.is;
@@ -102,18 +103,18 @@ public class ProcessingKafkaConsumerITest {
     }
 
     @Test
-    public void processingWithProcessingFailuresAndConsumerShutdown() throws IOException, InterruptedException {
+    public void processingWithProcessingFailuresAndConsumerShutdown() throws InterruptedException, ExecutionException {
         runProcessing(true); // shutdown consumers
     }
 
     @Test
-    public void processingWithProcessingFailures() throws IOException, InterruptedException {
+    public void processingWithProcessingFailures() throws InterruptedException, ExecutionException {
         runProcessing(false); // don't shutdown consumers
     }
 
     // If you need to debug this add 'log4j.logger.com.cerner.common.kafka=DEBUG' to log4j.properties in src/test/resources
     // Save output to a file as there will be a lot
-    public void runProcessing(boolean shutdownConsumers) throws IOException, InterruptedException {
+    public void runProcessing(boolean shutdownConsumers) throws InterruptedException, ExecutionException {
         AtomicBoolean finishedProcessing = new AtomicBoolean(false);
         Map<RecordId, List<ConsumerAction>> recordHistory = new ConcurrentHashMap<>();
 
@@ -126,7 +127,7 @@ public class ProcessingKafkaConsumerITest {
             topicNames.add(topicName);
             topicList.add(new NewTopic(topicName, PARTITIONS, (short) 1));
         }
-        kafkaAdminClient.createTopics(topicList);
+        kafkaAdminClient.createTopics(topicList).all().get();
 
         // Setup consumer threads
         Properties consumerProperties = new Properties();
