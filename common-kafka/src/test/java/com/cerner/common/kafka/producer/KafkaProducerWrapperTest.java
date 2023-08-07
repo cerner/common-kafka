@@ -94,7 +94,8 @@ public class KafkaProducerWrapperTest {
     }
 
     @Test
-    public void test_messageSentSynchronouslySuccessfully() throws IOException {
+    public void test_messageSentSynchronouslySuccessfully() throws IOException, InterruptedException,
+            ExecutionException {
         long previousSendCount = KafkaProducerWrapper.SEND_TIMER.count();
         long previousSyncSendCount = KafkaProducerWrapper.SYNC_SEND_TIMER.count();
         long previousFlushCount = KafkaProducerWrapper.FLUSH_TIMER.count();
@@ -103,7 +104,7 @@ public class KafkaProducerWrapperTest {
 
         Set<NewTopic> topics = new HashSet<>();
         topics.add(new NewTopic(topicName, 4, (short) 1));
-        kafkaAdminClient.createTopics(topics);
+        kafkaAdminClient.createTopics(topics).all().get();
 
         Properties props = KafkaTests.getProps();
         props.setProperty(KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
@@ -125,7 +126,8 @@ public class KafkaProducerWrapperTest {
     }
 
     @Test
-    public void test_multipleMessagesSentSynchronouslySuccessfully() throws IOException {
+    public void test_multipleMessagesSentSynchronouslySuccessfully() throws IOException, InterruptedException,
+            ExecutionException {
         long previousSendCount = KafkaProducerWrapper.SEND_TIMER.count();
         long previousSyncSendCount = KafkaProducerWrapper.SYNC_SEND_TIMER.count();
         long previousFlushCount = KafkaProducerWrapper.FLUSH_TIMER.count();
@@ -134,7 +136,7 @@ public class KafkaProducerWrapperTest {
 
         Set<NewTopic> topics = new HashSet<>();
         topics.add(new NewTopic(topicName, 4, (short) 1));
-        kafkaAdminClient.createTopics(topics);
+        kafkaAdminClient.createTopics(topics).all().get();
 
         Properties props = KafkaTests.getProps();
         props.setProperty(KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
@@ -198,7 +200,7 @@ public class KafkaProducerWrapperTest {
     }
 
     @Test
-    public void test_messageSentSuccessfully() throws IOException {
+    public void test_messageSentSuccessfully() throws IOException, InterruptedException, ExecutionException {
         long previousSendCount = KafkaProducerWrapper.SEND_TIMER.count();
         long previousSyncSendCount = KafkaProducerWrapper.SYNC_SEND_TIMER.count();
         long previousFlushCount = KafkaProducerWrapper.FLUSH_TIMER.count();
@@ -207,7 +209,7 @@ public class KafkaProducerWrapperTest {
 
         Set<NewTopic> topics = new HashSet<>();
         topics.add(new NewTopic(topicName, 4, (short) 1));
-        kafkaAdminClient.createTopics(topics);
+        kafkaAdminClient.createTopics(topics).all().get();
 
         Properties props = KafkaTests.getProps();
         props.setProperty(KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
@@ -272,10 +274,10 @@ public class KafkaProducerWrapperTest {
     }
 
     @Test
-    public void testSynchronous_messageTooLarge() throws IOException {
+    public void testSynchronous_messageTooLarge() throws IOException, InterruptedException, ExecutionException {
         Set<NewTopic> topics = new HashSet<>();
         topics.add(new NewTopic(topicName, 4, (short) 1));
-        kafkaAdminClient.createTopics(topics);
+        kafkaAdminClient.createTopics(topics).all().get();
 
         Properties props = KafkaTests.getProps();
         props.setProperty(KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
@@ -312,11 +314,12 @@ public class KafkaProducerWrapperTest {
     }
 
     @Test
-    public void test_messageSentSuccessfullyEvenWithFailure() throws IOException {
+    public void test_messageSentSuccessfullyEvenWithFailure() throws IOException, InterruptedException,
+            ExecutionException {
 
         Set<NewTopic> topics = new HashSet<>();
         topics.add(new NewTopic(topicName, 4, (short) 1));
-        kafkaAdminClient.createTopics(topics);
+        kafkaAdminClient.createTopics(topics).all().get();
 
         Properties props = getProps();
         props.setProperty(KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());

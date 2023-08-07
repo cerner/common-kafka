@@ -247,13 +247,13 @@ public class KafkaProducerPoolTest {
         mockPool.close();
     }
 
-    private void messageProduction(Properties config) throws InterruptedException, KafkaExecutionException, ExecutionException {
+    private void messageProduction(Properties config) throws InterruptedException, ExecutionException {
         String topicName = "topic_" + UUID.randomUUID().toString();
         NewTopic topic = new NewTopic(topicName, 4, (short) 1);
         Set<NewTopic> topics = new HashSet<>();
         topics.add(topic);
 
-        kafkaAdminClient.createTopics(topics);
+        kafkaAdminClient.createTopics(topics).all().get();
 
         Producer<String, String> producer = pool.getProducer(config);
 

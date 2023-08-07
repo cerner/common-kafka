@@ -38,6 +38,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
@@ -101,7 +102,7 @@ public class ProcessingKafkaConsumerRebalanceIT {
 
     @Test
     @Timeout(300)
-    public void deadlockFreeProcessingAfterMissedGeneration() throws IOException, InterruptedException {
+    public void deadlockFreeProcessingAfterMissedGeneration() throws InterruptedException, ExecutionException {
 
         Map<RecordId, List<ConsumerAction>> recordHistory = new ConcurrentHashMap<>();
 
@@ -110,7 +111,7 @@ public class ProcessingKafkaConsumerRebalanceIT {
         topicSet.add(new NewTopic(topicName, 1, (short) 1));
 
         // Only 1 replica since our testing only has 1 broker
-        kafkaAdminClient.createTopics(topicSet);
+        kafkaAdminClient.createTopics(topicSet).all().get();
 
         // Setup consumer threads
         Properties consumerProperties = new Properties();
